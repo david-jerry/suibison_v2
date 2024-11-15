@@ -55,7 +55,7 @@ The API may have rate limits to prevent abuse. Please refer to the official Next
 async def life_span(app: FastAPI):
     LOGGER.info("Server is running")
     await init_db()
-    # await fetch_sui_price()
+    await fetch_sui_price()
     yield
     LOGGER.info("Server has stopped")
 
