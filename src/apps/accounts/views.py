@@ -89,7 +89,7 @@ async def refresh_access_token(token: Annotated[User, Depends(RefreshTokenBearer
     "/get-users",
     status_code=status.HTTP_200_OK,
     response_model=Page[UserRead],
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="This is an admin only endpoint that returns a paginated list of user datas"
 )
 async def get_users(session: session, date: Optional[date] = None):
@@ -100,7 +100,7 @@ async def get_users(session: session, date: Optional[date] = None):
     "/get-transactions",
     status_code=status.HTTP_200_OK,
     response_model=Page[ActivitiesRead],
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="Returns a paginated list of filtered actvities to an admin"
 )
 async def get_transactions(session: session, date: Optional[date] = None):
@@ -111,7 +111,7 @@ async def get_transactions(session: session, date: Optional[date] = None):
     "/get-activities",
     status_code=status.HTTP_200_OK,
     response_model=Page[ActivitiesRead],
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="Returns a paginated list of all actvities to an admin"
 )
 async def get_activities(session: session, date: Optional[date] = None):
@@ -122,7 +122,7 @@ async def get_activities(session: session, date: Optional[date] = None):
     "/ban-user/{userId}",
     status_code=status.HTTP_200_OK,
     response_model=DeleteMessage,
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="Ban a specific user"
 )
 async def ban_a_user(userId: str, session: session):
@@ -135,7 +135,7 @@ async def ban_a_user(userId: str, session: session):
     "/create-token-meter",
     status_code=status.HTTP_201_CREATED,
     response_model=TokenMeterRead,
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="Create the token meter total capital, add an admin wallet address to transfer sui from individual user generated wallets into to show the meter bar."
 )
 async def create_token_meter(form_data: Annotated[TokenMeterCreate, Body()], session: session):
@@ -146,7 +146,7 @@ async def create_token_meter(form_data: Annotated[TokenMeterCreate, Body()], ses
     "/add-new-matrix-pool-user",
     status_code=status.HTTP_201_CREATED,
     response_model=DeleteMessage,
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="Adds a new user into the matrix pool user list for shares in the global matrix pool information."
 )
 async def add_new_pool_user(form_data: Annotated[MatrixUserCreateUpdate, Body()], session: session):
@@ -159,9 +159,126 @@ async def add_new_pool_user(form_data: Annotated[MatrixUserCreateUpdate, Body()]
     "/update-token-meter",
     status_code=status.HTTP_200_OK,
     response_model=TokenMeterRead,
-    dependencies=[Depends(admin_permission_check), Depends(AccessTokenBearer())],
+    dependencies=[Depends(admin_permission_check)],
     description="update the token meter."
 )
 async def update_token_meter(form_data: Annotated[TokenMeterUpdate, Body()], session: session):
     tokenMeter = await admin_service.updateTokenRecord(form_data, session)
     return tokenMeter
+
+@auth_router.get(
+    "/{userId}",
+    status_code=status.HTTP_200_OK,
+    response_model=UserWithReferralsRead,
+    dependencies=[Depends(admin_permission_check)],
+    description="Returns a specific user to an admin"
+)
+async def get_a_user(userId: str, session: session):
+    user = session.exec(select(User).where(User.userId == userId)).first()
+    referralsLv1List = await get_level_referrers(user.userId, 1)
+    referralsLv2List = await get_level_referrers(user.userId, 2)
+    referralsLv3List = await get_level_referrers(user.userId, 3)
+    referralsLv4List = await get_level_referrers(user.userId, 4)
+    referralsLv5List = await get_level_referrers(user.userId, 5)
+    
+    referralsLv1 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv1List] if len(referralsLv1List) > 0 else []
+    referralsLv2 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv2List] if len(referralsLv2List) > 0 else []
+    referralsLv3 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv3List] if len(referralsLv3List) > 0 else []
+    referralsLv4 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv4List] if len(referralsLv4List) > 0 else []
+    referralsLv5 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv5List] if len(referralsLv5List) > 0 else []
+
+    return {
+        "user": user, 
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5,
+    }
+
+
+
+
+
+
+# User Endpoints
+@user_router.get(
+    "/token-meter",
+    status_code=status.HTTP_200_OK,
+    response_model=Optional[TokenMeterRead],
+    description="Get token meter."
+)
+async def get_token_meter(session: session):
+    db_result = await session.exec(select(TokenMeter))
+    return db_result.first()
+
+@user_router.get(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=UserWithReferralsRead,
+    dependencies=[Depends(get_current_user)],
+    description="Returns a paginated list of all actvities to an admin"
+)
+async def me(user: Annotated[User, Depends(get_current_user)]):
+    referralsLv1List = await get_level_referrers(user.userId, 1)
+    referralsLv2List = await get_level_referrers(user.userId, 2)
+    referralsLv3List = await get_level_referrers(user.userId, 3)
+    referralsLv4List = await get_level_referrers(user.userId, 4)
+    referralsLv5List = await get_level_referrers(user.userId, 5)
+    
+    referralsLv1 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv1List] if len(referralsLv1List) > 0 else []
+    referralsLv2 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv2List] if len(referralsLv2List) > 0 else []
+    referralsLv3 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv3List] if len(referralsLv3List) > 0 else []
+    referralsLv4 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv4List] if len(referralsLv4List) > 0 else []
+    referralsLv5 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv5List] if len(referralsLv5List) > 0 else []
+    
+    return {
+        "user": user, 
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5,
+    }
+
+@user_router.get(
+    "/me/activities",
+    status_code=status.HTTP_200_OK,
+    response_model=Page[ActivitiesRead],
+    dependencies=[Depends(get_current_user)],
+    description="Returns a paginated list of all actvities to an admin"
+)
+async def get_my_activities(user: Annotated[User, Depends(get_current_user)], session: session):
+    activities = await user_service.getUserActivities(user, session)
+    return activities
+
+@user_router.patch(
+    "/me",
+    status_code=status.HTTP_200_OK,
+    response_model=UserWithReferralsRead,
+    dependencies=[Depends(get_current_user)],
+    description="Update records for a specific user by providing their userId as a required field ad then the body form data to update with"
+)
+async def update_profile(user: Annotated[User, Depends(get_current_user)], form_data: Annotated[UserUpdateSchema, Body()], session: session):
+    res_user = await user_service.updateUserProfile(user, form_data, session)
+    referralsLv1List = await get_level_referrers(res_user.userId, 1)
+    referralsLv2List = await get_level_referrers(res_user.userId, 2)
+    referralsLv3List = await get_level_referrers(res_user.userId, 3)
+    referralsLv4List = await get_level_referrers(res_user.userId, 4)
+    referralsLv5List = await get_level_referrers(res_user.userId, 5)
+    
+    referralsLv1 = [UserLevelReferral(userId=res_user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv1List] if len(referralsLv1List) > 0 else []
+    referralsLv2 = [UserLevelReferral(userId=res_user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv2List] if len(referralsLv2List) > 0 else []
+    referralsLv3 = [UserLevelReferral(userId=res_user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv3List] if len(referralsLv3List) > 0 else []
+    referralsLv4 = [UserLevelReferral(userId=res_user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv4List] if len(referralsLv4List) > 0 else []
+    referralsLv5 = [UserLevelReferral(userId=res_user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv5List] if len(referralsLv5List) > 0 else []
+    
+    return {
+        "user": res_user, 
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5,
+    }
+

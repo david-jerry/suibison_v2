@@ -5,7 +5,7 @@ from src.utils.logger import LOGGER
 from src.middleware import register_middleware
 from src.config.settings import Config
 from src.errors import register_all_errors
-from src.apps.accounts.views import auth_router #, user_router
+from src.apps.accounts.views import auth_router, user_router
 
 from fastapi import BackgroundTasks, FastAPI, Request
 from fastapi_pagination import add_pagination
@@ -87,7 +87,7 @@ register_middleware(app)
 add_pagination(app)
 
 app.include_router(auth_router, prefix=f"/{version}/auth", tags=["auth"])
-# app.include_router(user_router, prefix=f"/{version}/users", tags=["users"])
+app.include_router(user_router, prefix=f"/{version}/users", tags=["users"])
 
 
 if __name__ == "__main__":

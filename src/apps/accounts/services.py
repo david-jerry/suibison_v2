@@ -341,8 +341,7 @@ class UserServices:
         await session.refresh(user)
         return user
 
-    async def get_activities(self, user: User, session: AsyncSession):
-        db_result = await session.exec(select(Activities).where(Activities.userId == user.userId).limit(50))
-        activities = db_result.all()
-        return activities
+    async def getUserActivities(self, user: User, session: AsyncSession):
+        allActivities: Page[ActivitiesRead] = await paginate(session, select(Activities).where(Activities.userUid == user.uid).order_by(Activities.created))
+        return allActivities
     

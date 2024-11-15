@@ -271,7 +271,6 @@ class TokenMeterRead(BaseModel):
     tokenPrivateKey: Optional[str]
     totalCap: Decimal
     tokenPrice: Decimal
-    suiUsdPrice: Decimal
     percent_raised: Decimal = 0.00
 
     @staticmethod
