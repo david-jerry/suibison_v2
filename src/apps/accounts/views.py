@@ -4,8 +4,7 @@ import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Path, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse
-from fastapi_pagination import Page
-from fastapi_pagination.ext.sqlmodel import paginate
+from fastapi_pagination import Page, paginate
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -105,7 +104,7 @@ async def get_users(session: session, date: Optional[date] = None):
 )
 async def get_transactions(session: session, date: Optional[date] = None):
     transactions = await admin_service.getAllTransactions(date, session)
-    return transactions
+    return paginate(transactions)
 
 @auth_router.get(
     "/get-activities",
@@ -116,7 +115,7 @@ async def get_transactions(session: session, date: Optional[date] = None):
 )
 async def get_activities(session: session, date: Optional[date] = None):
     activities = await admin_service.getAllActivities(date, session)
-    return activities
+    return paginate(activities)
 
 @auth_router.patch(
     "/ban-user/{userId}",
@@ -251,7 +250,7 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
 )
 async def get_my_activities(user: Annotated[User, Depends(get_current_user)], session: session):
     activities = await user_service.getUserActivities(user, session)
-    return activities
+    return paginate(activities)
 
 @user_router.patch(
     "/me",

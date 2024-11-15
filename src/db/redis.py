@@ -33,7 +33,7 @@ async def token_in_blocklist(jti: str) -> bool:
     
     # Use 'exists' instead of 'get' for better performance
     is_blocked = await redis_client.exists(jti)
-    LOGGER.debug(f"Token is locked: {is_blocked == 1}")
+    LOGGER.debug(f"Token is blocked: {is_blocked == 1}")
     return is_blocked == 1
 
 async def add_level_referral(userId: str, level: int, referralId: str, balance: Decimal, name: Optional[str]):

@@ -325,6 +325,6 @@ class ActivitiesRead(BaseModel):
     strDetail: Optional[str]
     amountDetail: Optional[Decimal]
     suiAmount: Optional[Decimal]
-    userUid: str
+    userUid: uuid.UUID
 
     created: datetime

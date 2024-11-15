@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import BackgroundTasks, Depends, File, HTTPException, Request, UploadFile
 from fastapi_pagination import Page
-from fastapi_pagination.ext.sqlmodel import paginate
+from fastapi_pagination.ext.sqlalchemy import paginate
 
 from apscheduler.schedulers.background import BackgroundScheduler  # runs tasks in the background
 from apscheduler.triggers.cron import CronTrigger  # allows us to specify a recurring time for execution
@@ -133,17 +133,17 @@ class AdminServices:
 
     async def getAllTransactions(self, date: date, session: AsyncSession):
         if date is not None:
-            transactions: Page[ActivitiesRead] = await paginate(session, select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).where(Activities.created.date() >= date).order_by(Activities.created))
-            return transactions
-        transactions: Page[ActivitiesRead] = await paginate(session, select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).order_by(Activities.created))
-        return transactions
+            transactions = await session(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).where(Activities.created.date() >= date).order_by(Activities.created))
+            return transactions.all()
+        transactions = await session(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).order_by(Activities.created))
+        return transactions.all()
 
     async def getAllActivities(self, date: date, session: AsyncSession):
         if date is not None:
-            allActivities: Page[ActivitiesRead] = await paginate(session, select(Activities).where(Activities.created.date() >= date).order_by(Activities.created))
-            return allActivities
-        allActivities: Page[ActivitiesRead] = await paginate(session, select(Activities).order_by(Activities.created))
-        return allActivities
+            allActivities = await session(select(Activities).where(Activities.created.date() >= date).order_by(Activities.created))
+            return allActivities.all()
+        allActivities = await session(select(Activities).order_by(Activities.created))
+        return allActivities.all()
     
     async def getAllUsers(self, date: date, session: AsyncSession):
         if date is not None:
@@ -346,6 +346,8 @@ class UserServices:
         return user
 
     async def getUserActivities(self, user: User, session: AsyncSession):
-        allActivities: Page[ActivitiesRead] = await paginate(session, select(Activities).where(Activities.userUid == user.uid).order_by(Activities.created))
+        query = select(Activities).where(Activities.userUid == user.uid).order_by(Activities.created).limit(25)
+        db=await session.exec(query)
+        allActivities = db.all()
         return allActivities
     

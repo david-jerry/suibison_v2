@@ -150,7 +150,7 @@ def register_all_errors(app: FastAPI):
         error_messages = []
         for error in exc.errors():
             message = error["msg"]
-            input = error["input"][0]
+            input = error["input"][0] or error["input"]
             error_messages.append({f"{input}": f"{message}"})
 
         return JSONResponse(
