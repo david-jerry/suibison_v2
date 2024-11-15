@@ -73,11 +73,13 @@ class AdminServices:
         return existingTokenMeter
     
     async def addNewPoolUser(self, poolUser: MatrixUserCreateUpdate, session: AsyncSession):
-        active_pool = await session.exec(select(MatrixPool).where(MatrixPool.endDate <= now)).first()
+        db_pool_result = await session.exec(select(MatrixPool).where(MatrixPool.endDate <= now))
+        active_pool = db_pool_result.first()
         if active_pool is None:
             raise ActivePoolNotFound()
         
-        pool_user = await session.exec(select(MatrixPoolUsers).where(MatrixPool.uid == active_pool.uid)).first()
+        db_pool_user = await session.exec(select(MatrixPoolUsers).where(MatrixPool.uid == active_pool.uid))
+        pool_user = db_pool_user.first()
         if pool_user is None:
             new_user = MatrixPoolUsers(
                 userId = poolUser.userId,
@@ -182,7 +184,8 @@ class UserServices:
             # Save the referral level down to the 5th level in redis for improved performance
             if referring_user is not None:
                 fast_boost_time = referring_user.joined + timedelta(hours=24)
-                referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == referring_user.uid)).all()
+                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == referring_user.uid))
+                referrals = db_referrals.all()
                 
                 # check for fast boost and credit the users wallet balance accordingly
                 if referring_user.joined < fast_boost_time and len(referrals) >= 2:
@@ -219,7 +222,8 @@ class UserServices:
         return new_staking
 
     async def calculate_rank_earning(self, user: User, session: AsyncSession):
-        referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid)).all()
+        db_result = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid))
+        referrals = db_result.all()
         rankErning, rank = await get_rank(user.totalTeamVolume, user.wallet.totalDeposit, referrals)
         
         if user.rank != rank:

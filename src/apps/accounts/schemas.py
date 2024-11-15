@@ -269,9 +269,15 @@ class TokenMeterRead(BaseModel):
     tokenAddress: Optional[str]
     tokenPhrase: Optional[str]
     tokenPrivateKey: Optional[str]
-    totalCap: Decimal
-    tokenPrice: Decimal
+    totalCap: Decimal = 0.00
+    tokenPrice: Decimal = 0.00
     percent_raised: Decimal = 0.00
+    totalAmountCollected: Decimal = 0.00
+    suiUsdPrice: Decimal = 0.00
+    totalDeposited: Decimal = 0.00
+    totalWithdrawn: Decimal = 0.00
+    totalSentToGMP: Decimal = 0.00
+    totalDistributedByGMP: Decimal = 0.00
 
     @staticmethod
     def percentage_raised(token: "TokenMeterRead"):

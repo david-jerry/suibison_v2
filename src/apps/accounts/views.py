@@ -174,7 +174,8 @@ async def update_token_meter(form_data: Annotated[TokenMeterUpdate, Body()], ses
     description="Returns a specific user to an admin"
 )
 async def get_a_user(userId: str, session: session):
-    user = session.exec(select(User).where(User.userId == userId)).first()
+    db_user = session.exec(select(User).where(User.userId == userId))
+    user = db_user.first()
     referralsLv1List = await get_level_referrers(user.userId, 1)
     referralsLv2List = await get_level_referrers(user.userId, 2)
     referralsLv3List = await get_level_referrers(user.userId, 3)
