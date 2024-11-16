@@ -253,6 +253,36 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
         "referralsLv5": referralsLv5,
     }
 
+@user_router.post(
+    "/me/stake",
+    status_code=status.HTTP_201_CREATED,
+    response_model=UserWithReferralsRead,
+    dependencies=[Depends(get_current_user)],
+    description="Initiates a stake and staarts the countdown to a 100days"
+)
+async def initiate_a_stake(form_data: Annotated[StakingCreate, Body()], user: Annotated[User, Depends(get_current_user)], session: session):
+    user = await user_service.stake_sui(form_data.deposit, user, session)
+    referralsLv1List = await get_level_referrers(user.userId, 1)
+    referralsLv2List = await get_level_referrers(user.userId, 2)
+    referralsLv3List = await get_level_referrers(user.userId, 3)
+    referralsLv4List = await get_level_referrers(user.userId, 4)
+    referralsLv5List = await get_level_referrers(user.userId, 5)
+    
+    referralsLv1 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv1List] if len(referralsLv1List) > 0 else []
+    referralsLv2 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv2List] if len(referralsLv2List) > 0 else []
+    referralsLv3 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv3List] if len(referralsLv3List) > 0 else []
+    referralsLv4 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv4List] if len(referralsLv4List) > 0 else []
+    referralsLv5 = [UserLevelReferral(userId=user.userId, level=1, referralName=ref["name"], referralId=ref["referralId"], totalStake=ref["balance"]) for ref in referralsLv5List] if len(referralsLv5List) > 0 else []
+    
+    return {
+        "user": user, 
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5,
+    }
+
 @user_router.get(
     "/me/activities",
     status_code=status.HTTP_200_OK,
@@ -293,4 +323,6 @@ async def update_profile(user: Annotated[User, Depends(get_current_user)], form_
         "referralsLv4": referralsLv4,
         "referralsLv5": referralsLv5,
     }
+
+
 

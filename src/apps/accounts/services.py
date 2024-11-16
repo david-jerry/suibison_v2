@@ -34,6 +34,24 @@ from mnemonic import Mnemonic
 from sui_python_sdk.wallet import SuiWallet
 
 now = datetime.now()
+scheduler = BackgroundScheduler({
+    "apscheduler.jobstores.default": {
+        "type": "sqlalchemy",
+        "url": Config.DATABASE_URL
+    },
+    'apscheduler.executors.default': {
+        'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
+        'max_workers': '50'
+    },
+    'apscheduler.executors.processpool': {
+        'type': 'processpool',
+        'max_workers': '20'
+    },
+    'apscheduler.job_defaults.coalesce': 'false',
+    'apscheduler.job_defaults.max_instances': '12',
+    'apscheduler.timezone': 'UTC',
+})
+
 
 class AdminServices:
     async def createTokenRecord(self, form_data: TokenMeterCreate, session: AsyncSession):
@@ -393,9 +411,31 @@ class UserServices:
                 coins.append(coin.coinObjectId)
         try:
             transResponse = await SUI.payAllSui(user.wallet.address, token_meter.address, 10000, coins)
-            return transResponse.txBytes
+            executeTrans = await SUI.executeTransaction(transResponse.txBytes, user.wallet.phrase)
+            return executeTrans.digest
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+    async def transferFromAdminWallet(self, wallet: str, amount: Decimal, user: User, session: AsyncSession):
+        """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
+        db_result = await session.exec(select(TokenMeter))
+        token_meter: Optional[TokenMeter] = db_result.first()
+
+        if token_meter is None:
+            raise TokenMeterDoesNotExists()
+        
+        coinDetail = await SUI.getCoins(user.wallet.address)
+        coins = []
+        for coin in coinDetail:
+            if coin.coinType == "0x2::sui::SUI":
+                coins.append(coin.coinObjectId)
+        try:
+            transResponse = await SUI.paySui(token_meter.tokenAddress, wallet, amount, 10000, coins)
+            executeTrans = await SUI.executeTransaction(transResponse.txBytes, user.wallet.phrase)
+            return executeTrans.digest
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
 
     async def withdrawToUserWallet(self, user: User, withdrawal_wallet: str, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
@@ -471,66 +511,76 @@ class UserServices:
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
       
+    async def update_amount_of_sui_token_earned(self, tokenPrice: Decimal, amount_in_sui: Decimal, user: User, session: AsyncSession):
+        usd = await get_sui_usd_price()
+        sui_purchased = amount_in_sui * usd
+        token_worth_in_usd_purchased = sui_purchased / tokenPrice
+        user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
+        return None
 
-    # async def stake_sui(self, amount: Decimal, user: User, session: AsyncSession):
-    #     # user has to successfuly transfer into this wallet account then we 
-    #     # first check for them to confirm the transfer is successful
-    #     # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
-    #     coin_balance = await SUI.getBalance(user.wallet.address)
-    #     db_token_meter = await session.exec(select(TokenMeter))
-    #     token_meter = db_token_meter.first()
+    async def stake_sui(self, amount: Decimal, user: User, session: AsyncSession):
+        # user has to successfuly transfer into this wallet account then we 
+        # first check for them to confirm the transfer is successful
+        # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
+        coin_balance = await SUI.getBalance(user.wallet.address)
+        db_token_meter = await session.exec(select(TokenMeter))
+        token_meter = db_token_meter.first()
 
-    #     # Check if user has enough balance to stake
-    #     if Decimal(coin_balance.coinObjectCount / 10**9) < (amount - Decimal(0.1)):
-    #         raise InsufficientBalance()
+        # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
+        if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
+            raise InsufficientBalance()
         
-    #     amount_to_show = amount - (amount * Decimal(0.1))
-    #     sbt_amount = Decimal(coin_balance.coinObjectCount / 10**9) * Decimal(0.1)
+        amount_to_show = amount - (amount * Decimal(0.1))
+        sbt_amount = Decimal(coin_balance.coinObjectCount / 10**9) * Decimal(0.1)
         
-    #     token_meter.totalAmountCollected += sbt_amount
-    #     token_meter.totalDeposited += amount
+        # update sbt records
+        token_meter.totalAmountCollected += sbt_amount
+        token_meter.totalDeposited += amount
+        
+        # update the token gannered
+        await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-    #     if user.staking.end < now:
-    #         stake = user.staking
-    #         enddate = now + timedelta(days=100)
-    #         stake.deposit += amount_to_show
-    #         stake.startedAt = now
-    #         stake.endingAt = now + timedelta(days=100)
-    #         stake.nextRoiIncrease = now + timedelta(days=5)
+        enddate = now + timedelta(days=100)
+        stake = user.staking
+        
+        if stake.end < now:
+            stake.deposit += amount_to_show
+            stake.startedAt = now
+            stake.endingAt = enddate
+            stake.nextRoiIncrease = now + timedelta(days=5)
 
-    #         # Check if first time staking then add the bonuses to the referrals
-    #         if not user.hasMadeFirstDeposit:
-    #             # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
-    #             await self.add_referrer_earning(user.referrer.user.userId, amount, 1, session)
+            trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
+            scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
+            scheduler.start()
 
-    #         new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount, userId=user.userId)
-    #         session.add(new_activity)
+            # Check if first time staking then add the bonuses to the referrals
+            if not user.hasMadeFirstDeposit:
+                # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
+                await self.add_referrer_earning(user.referrer.user.userId, amount, 1, session)
 
-    #         await session.commit()
-    #         await session.refresh(active_staking)
-    #     else:
-    #         stake = user.staking
-    #         stake.deposit += amount
-    #         stake.startedAt = now
-    #         stake.endingAt = now + timedelta(days=100)
-    #         stake.nextRoiIncrease = now + timedelta(days=5)
+            new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
+            session.add(new_activity)
+
+        else:
+            stake.deposit += amount_to_show
+            stake.startedAt = now
+            stake.endingAt = enddate
+            stake.nextRoiIncrease = now + timedelta(days=5)
             
-    #         new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
-    #         session.add(new_activity)
+            new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
+            session.add(new_activity)
 
-    #         await session.commit()
-    #         await session.refresh(stake)
+            await session.commit()
+            await session.refresh(stake)
             
-    #         trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date)
-    #         scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
-    #         scheduler.start()
                         
-            
-    #     # after successfully topping up stake sui in the user's 
-    #     # wallet to the admin so it starts afresh from 0 while updating the 
-    #     # actual system wallet balance
-    #     await self.transferToAdminWallet(user, token_meter)
-    #     return active_staking
+        await session.commit()
+        await session.refresh(user)
+        # after successfully topping up stake sui in the user's 
+        # wallet to the admin so it starts afresh from 0 while updating the 
+        # actual system wallet balance
+        await self.transferToAdminWallet(user, token_meter)
+        return user
         
 
     

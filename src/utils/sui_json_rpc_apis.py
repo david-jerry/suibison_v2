@@ -1,3 +1,4 @@
+from decimal import Decimal
 import pprint
 from typing import List
 import base64
@@ -89,7 +90,7 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def paySui(self, address: str, recipient: str, amount: int, gas_budget: int, coinId: str):
+    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: int, coinId: str):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
