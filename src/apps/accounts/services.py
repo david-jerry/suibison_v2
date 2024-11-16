@@ -579,7 +579,7 @@ class UserServices:
         # after successfully topping up stake sui in the user's 
         # wallet to the admin so it starts afresh from 0 while updating the 
         # actual system wallet balance
-        await self.transferToAdminWallet(user, token_meter)
+        # await self.transferToAdminWallet(user, token_meter)
         return user
         
 
