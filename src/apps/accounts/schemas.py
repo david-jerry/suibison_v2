@@ -198,7 +198,9 @@ class UserRead(UserBaseSchema):
 
 class UserReferralRead(BaseModel):
     uid: uuid.UUID
+    level: int
     userUid: uuid.UUID
+    referrerUid: uuid.UUID
 
     class Config:
         from_attributes = True
@@ -212,7 +214,7 @@ class RegAndLoginResponse(BaseModel):
 
 
 class UserCreateOrLoginSchema(BaseModel):
-    telegram_init_data: str
+    telegram_init_data: Optional[str] = None
     userId: Annotated[str, constr(max_length=12, min_length=7)]
     firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
@@ -225,47 +227,13 @@ class UserUpdateSchema(UserBaseSchema):
     dob: Optional[date] = None
 
 
-class UserLevelReferral(BaseModel):
-    userId: str
-    referralName: str
-    referralId: int
-    totalStake: Decimal = 0.00
-    level: int
-    reward: Decimal
-
-    @staticmethod
-    def calculate_bonus(level: int, totalStake: Decimal) -> Decimal:
-        if level == 1:
-            bonus = totalStake * 0.1
-            return bonus
-        elif level == 2:
-            bonus = totalStake * 0.05
-            return bonus
-        elif level == 3:
-            bonus = totalStake * 0.03
-            return bonus
-        elif level == 4:
-            bonus = totalStake * 0.02
-            return bonus
-        elif level == 5:
-            bonus = totalStake * 0.01
-            return bonus
-        return 0
-
-    @classmethod
-    def from_orm(cls, user: "UserLevelReferral"):
-        user_dict = user.model_dump()
-        user_dict["reward"] = cls.calculate_bonus(user.level, user.totalStake)
-        return cls(**user_dict)
-
-
 class UserWithReferralsRead(BaseModel):
     user: UserRead
-    referralsLv1: List[UserLevelReferral]
-    referralsLv2: List[UserLevelReferral]
-    referralsLv3: List[UserLevelReferral]
-    referralsLv4: List[UserLevelReferral]
-    referralsLv5: List[UserLevelReferral]
+    referralsLv1: List[UserRead]
+    referralsLv2: List[UserRead]
+    referralsLv3: List[UserRead]
+    referralsLv4: List[UserRead]
+    referralsLv5: List[UserRead]
 
 
 class WalletBaseSchema(BaseModel):

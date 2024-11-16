@@ -71,6 +71,10 @@ class User(SQLModel, table=True):
 
     # referral
     referrer: Optional["UserReferral"] = Relationship(
+        back_populates="referrer",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
+    )
+    referrals: List["UserReferral"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
     )
@@ -104,16 +108,20 @@ class User(SQLModel, table=True):
 
 
 class UserReferral(SQLModel, table=True):
-    """Get the referring user and store the referral of a new user into this model"""
+    """Get the referring user and store the referral of a new user into this model with their level to determine who was addded"""
     __tablename__ = "referrals"
 
     uid: uuid.UUID = Field(
         default_factory=uuid.uuid4,
         sa_column=Column(pg.UUID, primary_key=True, unique=True, nullable=False)
     )
+    
+    level: int = Field(default=1, nullable=True)
 
+    referrerUid: Optional[uuid.UUID] = Field(default=None, nullable=True, foreign_key="users.uid")
+    referrer: Optional["User"] = Relationship(back_populates="referrer")
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
-    user: Optional["User"] = Relationship(back_populates="referrer")
+    user: Optional["User"] = Relationship(back_populates="referrals")
 
     def __repr__(self) -> str:
         return f"<UserReferral {self.userUid}>"
@@ -142,6 +150,7 @@ class UserWallet(SQLModel, table=True):
     expectedRankBonus: Decimal = Field(decimal_places=9, default=0.00)
 
     weeklyRankEarnings: Decimal = Field(decimal_places=9, default=0.00)
+    passwordHash: str = Field(nullable=True)
 
     totalDeposit: Decimal = Field(decimal_places=9, default=0.00)
     totalTokenPurchased: Decimal = Field(decimal_places=9, default=0.00)

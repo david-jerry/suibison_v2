@@ -24,7 +24,7 @@ from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, To
 from src.apps.accounts.schemas import ActivitiesRead, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
-from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
+from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
 from src.utils.hashing import createAccessToken, verifyTelegramAuthData
 from src.utils.logger import LOGGER
 from src.config.settings import Config
@@ -183,15 +183,20 @@ class AdminServices:
     
     
 class UserServices:
-    async def create_referral_level(self, user: User, referral_userId: str, referral_name: str, level: int, session: AsyncSession):
+    async def create_referral_level(self, user: User, referral_userId: str, level: int, session: AsyncSession):
         if level < 6:
             user.totalNetwork += 1
             user.totalReferrals += 1 if level == 1 else 0
-            await add_level_referral(user.userId, level=level, referralId=referral_userId, balance=Decimal(0.00), name=referral_name)
             
-            session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"", userUid=user.uid))
-            await session.commit()            
-            await self.create_referral_level(user.referrer, referral_userId, referral_name, level + 1, session)
+            new_referral = UserReferral(
+                level=level,
+                userUid=user.uid,
+                referrerUid=referral_userId,
+            )
+            session.add(new_referral)
+            session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=user.uid))
+            # await session.commit()            
+            await self.create_referral_level(user.referrer, referral_userId, level + 1, session)
         return None
     
     async def create_referrer(self, referrer: Optional[str], new_user: User, session: AsyncSession):
@@ -200,24 +205,19 @@ class UserServices:
             referring_user = db_result.first()
             
             # Save the referral level down to the 5th level in redis for improved performance
-            if referring_user is not None:
-                fast_boost_time = referring_user.joined + timedelta(hours=24)
-                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == referring_user.uid))
-                referrals = db_referrals.all()
-                
-                # check for fast boost and credit the users wallet balance accordingly
-                if referring_user.joined < fast_boost_time and len(referrals) >= 2:
-                    referring_user.wallet.totalFastBonus += Decimal(3.00)
-                    referring_user.wallet.balance += Decimal(3.00)
-                    
-                new_referral = UserReferral(
-                    userUid=referring_user.uid,
-                )
-                session.add(new_referral)
-                LOGGER.debug(f"NEW REFERRAL:: {new_referral.userUid}")
-                
-                referral_name = f"{new_user.firstName} {new_user.lastName}" if new_user.firstName is not None and new_user.lastName else None
-                self.create_referral_level(referring_user, new_user.userId, referral_name, 1, session)
+            if referring_user is None:
+                raise ReferrerNotFound()
+
+            fast_boost_time = referring_user.joined + timedelta(hours=24)
+            db_referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == referring_user.uid).where(UserReferral.level == 1))
+            referrals = db_referrals.all()
+            
+            # check for fast boost and credit the users wallet balance accordingly
+            if referring_user.joined < fast_boost_time and len(referrals) >= 2:
+                referring_user.wallet.totalFastBonus += Decimal(3.00)
+                referring_user.wallet.balance += Decimal(3.00)
+                                
+            self.create_referral_level(referring_user, new_user.userId, 1, session)
         return None
                 
     async def add_referrer_earning(self, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
@@ -267,7 +267,7 @@ class UserServices:
         return new_staking
 
     async def calculate_rank_earning(self, user: User, session: AsyncSession):
-        db_result = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid))
+        db_result = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid).where(UserReferral.level == 1))
         referrals = db_result.all()
         rankErning, rank = await get_rank(user.totalTeamVolume, user.wallet.totalDeposit, referrals)
         
@@ -294,6 +294,34 @@ class UserServices:
         session.add(user)
         return None
 
+    async def authenticate_user(self, userId: str, session):
+        user = await user_exists_check(userId, session)
+                
+        # check if the user is blocked
+        if user is not None and user.isBlocked:
+            raise UserBlocked()
+        
+        # update the users rank record immediately they open the webapp and the weeks match up
+        if user is not None:
+            await self.calculate_rank_earning(user, session)
+                
+        # generate access and refresh token so long the telegram init data is valid
+        accessToken = createAccessToken(
+            user_data={
+                "userId": user.userId,
+            },
+            expiry=timedelta(seconds=Config.ACCESS_TOKEN_EXPIRY)
+        )
+        refreshToken = createAccessToken(
+            user_data={
+                "userId": user.userId,
+            },
+            refresh=True,
+            expiry=timedelta(days=7)
+        )
+        
+        return accessToken, refreshToken, user
+
     async def register_new_user(self, admin: bool, referrer: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
         if not verifyTelegramAuthData(form_data.telegram_init_data):
@@ -302,45 +330,29 @@ class UserServices:
         user = await user_exists_check(form_data.userId, session)
                 
         if user is None:
-            new_user = User(
+            user = User(
                 userId=form_data.userId,
                 firstName=form_data.firstName,
                 lastName=form_data.lastName,
                 phoneNumber=form_data.phoneNumber,
                 isAdmin=admin,
             )
-            session.add(new_user)
-            stake = await self.create_staking_account(new_user, session)
+            session.add(user)
+            stake = await self.create_staking_account(user, session)
             LOGGER.debug(f"Stake:: {stake}")
             # Create an activity record for this new user
-            new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=new_user.uid)
+            new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=user.uid)
             session.add(new_activity)
             
-            new_wallet = await self.create_wallet(new_user, session)
+            new_wallet = await self.create_wallet(user, session)
             LOGGER.debug(f"NEW WALLET:: {new_wallet}")
             
-            await session.commit()
-            await session.refresh(new_user)
-            
-
             if referrer is not None:
-                await self.create_referrer(referrer, new_user, session)
+                await self.create_referrer(referrer, user, session)
 
-            # generate access and refresh token so long the telegram init data is valid
-            accessToken = createAccessToken(
-                user_data={
-                    "userId": new_user.userId,
-                },
-                expiry=timedelta(seconds=Config.ACCESS_TOKEN_EXPIRY)
-            )
-            refreshToken = createAccessToken(
-                user_data={
-                    "userId": new_user.userId,
-                },
-                refresh=True,
-                expiry=timedelta(days=7)
-            )
-            return accessToken, refreshToken, new_user
+            await session.commit()
+            await session.refresh(user)
+            
     
         # check if the user is blocked
         if user is not None and user.isBlocked:
@@ -436,7 +448,6 @@ class UserServices:
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-
     async def withdrawToUserWallet(self, user: User, withdrawal_wallet: str, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
         db_result = await session.exec(select(TokenMeter))
@@ -523,19 +534,20 @@ class UserServices:
         # first check for them to confirm the transfer is successful
         # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
         coin_balance = await SUI.getBalance(user.wallet.address)
+        amount: Decimal = Decimal(coin_balance.coinObjectCount / 10**9)
         db_token_meter = await session.exec(select(TokenMeter))
         token_meter = db_token_meter.first()
 
-        # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
-        if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
-            raise InsufficientBalance()
-        
         amount_to_show = amount - (amount * Decimal(0.1))
         sbt_amount = Decimal(coin_balance.coinObjectCount / 10**9) * Decimal(0.1)
         
         # update sbt records
         token_meter.totalAmountCollected += sbt_amount
         token_meter.totalDeposited += amount
+
+        # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
+        if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
+            raise InsufficientBalance()
         
         # update the token gannered
         await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)

@@ -87,6 +87,11 @@ class UserNotFound(SuiBisonException):
     pass
 
 
+class ReferrerNotFound(SuiBisonException):
+    """Referrer not found"""
+    pass
+
+
 class UserBlocked(SuiBisonException):
     """This user has been blocked due to suspicious attempts or activities on their account."""
     pass
@@ -205,6 +210,13 @@ def register_all_errors(app: FastAPI):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
             content={"message": "Incorrect Scheduling task value.", "error_code": "incorrect_scheduling_time"}
+        )
+
+    @app.exception_handler(ReferrerNotFound)
+    async def ReferrerNotFoundError(exc: ReferrerNotFound):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "We could not find a user with that userId.", "error_code": "referrer_not_found"}
         )
 
     @app.exception_handler(InvalidRefreshToken)
