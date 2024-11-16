@@ -73,4 +73,4 @@ async def get_level_referrers(userId: str, level: int):
     
 async def get_sui_usd_price():
     price = await redis_client.get("sui_price")
-    return json.loads(price.decode("utf-8"))
+    return Decimal(json.loads(price.decode("utf-8")))

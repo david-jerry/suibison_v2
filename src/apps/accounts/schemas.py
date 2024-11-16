@@ -41,7 +41,7 @@ class CoinBalance(BaseModel):
     coinType: str
     coinObjectCount: int
     totalBalance: str
-    lockedBalance: str
+    lockedBalance: dict
 
 
 class MetaData(BaseModel):
@@ -58,9 +58,9 @@ class WithdrawEarning(BaseModel):
 
 
 class SuiTransferResponse(BaseModel):
-    gas: List[str]
-    inputObjects: List[str]
-    txBytes: str
+    gas: List[dict]
+    inputObjects: List[dict]
+    txBytes: bytes
 
 
 class AllStatisticsRead(BaseModel):
@@ -71,9 +71,76 @@ class AllStatisticsRead(BaseModel):
     totalAmountSentToGMP: Decimal
     totalDistributedFromGMP: Decimal
 
+class TransactionDataResponse(BaseModel):
+    messageVersion: str
+    transaction: "TransactionData"
+    sender: str
+    gasData: List["GasData"] 
+    
 
+class TransactionData(BaseModel):
+    kind: str
+    inputs: List[dict]
+    transactions: List[List[dict]]
+
+
+class GasData(BaseModel):
+    payment: List[dict]
+    owner: str
+    price: str
+    budget: str
+
+
+class TransactionResponse(BaseModel):
+    data: TransactionDataResponse
+    txSignatures: List[str]
+
+
+class StatusResult(BaseModel):
+    status: str
+    
+    
+class GasUsed(BaseModel):
+    computationCost: str
+    storageCost: str
+    storageRebate: str
+    nonRefundableStorageFee: str
+    
+    
+class Owner(BaseModel):
+    AddressOwner: str
+
+
+class Reference(BaseModel):
+    objectId: str
+    version: int
+    digest: str
+
+
+class ObjectChange(BaseModel):
+    owner: Owner
+    reference: Reference
+    
+    
+class Effects(BaseModel):
+    messageVersion: str
+    status: StatusResult
+    executedEpoch: str
+    gasUsed: GasUsed
+    transactionDigest: str
+    mutated: List[ObjectChange]
+
+
+class TransactionResponseData(BaseModel):
+    digest: str
+    transaction: TransactionResponse
+    rawTransaction: str
+    effects: Effects
+    objectChanges: List[dict]
+    
+    
 class UserBaseSchema(BaseModel):
-    firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
+    firstName: Annotated[Optional[TransactionDataResponse], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
     phoneNumber: Annotated[Optional[str], constr(min_length=10, max_length=14)
                            ] = None  # Phone number with length constraints
@@ -264,6 +331,10 @@ class TokenMeterUpdate(BaseModel):
     totalCap: Optional[Decimal] = None
 
 
+class SuiDollarRate(BaseModel):
+    rate: Decimal
+    
+    
 class TokenMeterRead(BaseModel):
     uid: uuid.UUID
     tokenAddress: Optional[str]

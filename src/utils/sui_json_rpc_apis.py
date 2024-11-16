@@ -1,14 +1,20 @@
+import pprint
 from typing import List
-import httpx
+import base64
 import asyncio
 import requests
 
-from src.apps.accounts.schemas import Coin, CoinBalance, MetaData, SuiTransferResponse
+from src.apps.accounts.models import User
+from src.apps.accounts.schemas import Coin, CoinBalance, MetaData, SuiTransferResponse, TransactionResponseData
 from src.config.settings import Config
+from src.utils.logger import LOGGER
+from sui_python_sdk.wallet import SuiWallet
+
 
 class SUIRequests:
     def __init__(self, url: str = Config.SUI_RPC) -> None:
         self.url = url
+        self.decimals = 10**9
         
     async def getBalance(self, address: str, coinType: str = "0x2::sui::SUI"):
         """
@@ -31,6 +37,7 @@ class SUIRequests:
             if 'error' in result:
                 raise Exception(f"Error: {result['error']}")
             res = result["result"]
+            LOGGER.debug(res)
             return CoinBalance(**res)
         else:
             response.raise_for_status()
@@ -82,17 +89,17 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def paySui(self, address: str, recipient: str, amount: int, gas_budget: int, coinId: List[str]):
+    async def paySui(self, address: str, recipient: str, amount: int, gas_budget: int, coinId: str):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_paySui",
             "params": [
                 address,
-                coinId,
+                [coinId],
                 [recipient],
-                [amount],
-                gas_budget
+                [str(amount)],
+                str(gas_budget)
             ]
         }
         
@@ -107,16 +114,16 @@ class SUIRequests:
         else:
             response.raise_for_status()
         
-    async def payAllSui(self, address: str, recipient: str, gas_budget: int, coinId: List[str]):
+    async def payAllSui(self, address: str, recipient: str, gas_budget: int, coinId: str):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_payAllSui",
             "params": [
                 address,
-                coinId,
+                [coinId],
                 [recipient],
-                gas_budget
+                str(gas_budget)
             ]
         }
         
@@ -130,5 +137,34 @@ class SUIRequests:
             return SuiTransferResponse(**res)
         else:
             response.raise_for_status()
+            
+    async def executeTransaction(self, bcsTxBytes: str, phrase: str):
+        # NOTE WORK ON THIS TO DETERMINE THE SIGNER
+        my_wallet = SuiWallet(mnemonic=phrase)
+        signer = my_wallet.full_private_key
+        LOGGER.debug(signer)
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "sui_executeTransactionBlock",
+            "params": [
+                str(bcsTxBytes),
+                ["0"]
+            ]
+        }
+        response = await asyncio.to_thread(requests.post, self.url, json=payload)
+        LOGGER.debug(response)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if 'error' in result:
+                raise Exception(f"Error: {result['error']}")
+            res = result["result"]
+            LOGGER.debug(pprint.pprint(res, indent=4))
+            return TransactionResponseData(**res)
+        else:
+            response.raise_for_status()
 
 SUI = SUIRequests()
+
+

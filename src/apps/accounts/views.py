@@ -11,11 +11,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import AccessTokenBearer, RefreshTokenBearer, TokenBearer, admin_permission_check, get_current_user
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User
-from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, StakingCreate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserLevelReferral, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning
+from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserLevelReferral, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning
 from src.apps.accounts.services import AdminServices, UserServices
 from src.db.engine import get_session
 from src.config.settings import Config
-from src.db.redis import add_jti_to_blocklist, get_level_referrers
+from src.db.redis import add_jti_to_blocklist, get_level_referrers, get_sui_usd_price
 from src.errors import ActivePoolNotFound, InvalidTelegramAuthData, InvalidToken, UserAlreadyExists
 from src.utils.hashing import createAccessToken , verifyTelegramAuthData
 
@@ -202,6 +202,18 @@ async def get_a_user(userId: str, session: session):
 
 
 # User Endpoints
+@user_router.get(
+    "/get-sui-rate",
+    status_code=status.HTTP_200_OK,
+    response_model=SuiDollarRate,
+    description="Get the rate of sui in dollars form yfinance"
+)
+async def get_sui_rate():
+    rate = await get_sui_usd_price()
+    return {
+        "rate": rate
+    }
+    
 @user_router.get(
     "/token-meter",
     status_code=status.HTTP_200_OK,
