@@ -529,7 +529,7 @@ class UserServices:
         user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
         return None
 
-    async def stake_sui(self, amount: Decimal, user: User, session: AsyncSession):
+    async def stake_sui(self, user: User, session: AsyncSession):
         # user has to successfuly transfer into this wallet account then we 
         # first check for them to confirm the transfer is successful
         # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance

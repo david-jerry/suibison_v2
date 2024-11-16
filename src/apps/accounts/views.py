@@ -295,8 +295,8 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
     dependencies=[Depends(get_current_user)],
     description="Initiates a stake and staarts the countdown to a 100days"
 )
-async def initiate_a_stake(form_data: Annotated[StakingCreate, Body()], user: Annotated[User, Depends(get_current_user)], session: session):
-    user = await user_service.stake_sui(form_data.deposit, user, session)
+async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):
+    user = await user_service.stake_sui(user, session)
     referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
     referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
