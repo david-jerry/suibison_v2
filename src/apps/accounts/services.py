@@ -560,11 +560,14 @@ class UserServices:
         token_meter.totalDeposited += amount
 
         # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
-
+        progress = False
+        
         try:
             if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
                 user.staking.deposit += amount_to_show
+                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
                 raise InsufficientBalance()
+            progress = True
         except InsufficientBalance:
             if expiry_set < datetime.now():
                 await session.commit()
@@ -573,43 +576,44 @@ class UserServices:
             coin_balance = await SUI.getBalance(user.wallet.address)
             if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
                 raise InsufficientBalance()
+            progress = True
             
         
         # update the token gannered
-        await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
         enddate = now + timedelta(days=100)
         stake = user.staking
         
-        if stake.end < now:
-            stake.deposit += amount_to_show
-            stake.startedAt = now
-            stake.endingAt = enddate
-            stake.nextRoiIncrease = now + timedelta(days=5)
+        if progress:
+            if stake.end < now:
+                stake.deposit += amount_to_show
+                stake.startedAt = now
+                stake.endingAt = enddate
+                stake.nextRoiIncrease = now + timedelta(days=5)
 
-            trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
-            scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
-            scheduler.start()
+                trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
+                scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
+                scheduler.start()
 
-            # Check if first time staking then add the bonuses to the referrals
-            if not user.hasMadeFirstDeposit:
-                # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
-                await self.add_referrer_earning(user.referrer.userId, amount, 1, session)
+                # Check if first time staking then add the bonuses to the referrals
+                if not user.hasMadeFirstDeposit:
+                    # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
+                    await self.add_referrer_earning(user.referrer.userId, amount, 1, session)
 
-            new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
-            session.add(new_activity)
+                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
+                session.add(new_activity)
 
-        else:
-            stake.deposit += amount_to_show
-            stake.startedAt = now
-            stake.endingAt = enddate
-            stake.nextRoiIncrease = now + timedelta(days=5)
-            
-            new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
-            session.add(new_activity)
+            else:
+                stake.deposit += amount_to_show
+                stake.startedAt = now
+                stake.endingAt = enddate
+                stake.nextRoiIncrease = now + timedelta(days=5)
+                
+                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
+                session.add(new_activity)
 
-            await session.commit()
-            await session.refresh(stake)
+                await session.commit()
+                await session.refresh(stake)
             
                         
         await session.commit()
