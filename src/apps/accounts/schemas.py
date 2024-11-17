@@ -60,12 +60,12 @@ class WithdrawEarning(BaseModel):
 class SuiTransferResponse(BaseModel):
     gas: List[dict]
     inputObjects: List[dict]
-    txBytes: bytes
+    txBytes: str
 
 
 class AllStatisticsRead(BaseModel):
-    totalAmountStaked: Decimal = 0.00
-    totalMatrixPoolGenerated: Decimal = 0.00
+    totalAmountStaked: Decimal = Decimal(0)
+    totalMatrixPoolGenerated: Decimal = Decimal(0)
     averageDailyReferral: int = 0
     totalAmountWithdrawn: Decimal
     totalAmountSentToGMP: Decimal
@@ -140,10 +140,9 @@ class TransactionResponseData(BaseModel):
     
     
 class UserBaseSchema(BaseModel):
-    firstName: Annotated[Optional[TransactionDataResponse], constr(max_length=255)] = None  # First name with max length constraint
+    firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
-    phoneNumber: Annotated[Optional[str], constr(min_length=10, max_length=14)
-                           ] = None  # Phone number with length constraints
+    phoneNumber: Annotated[Optional[str], constr(min_length=10, max_length=14)] = None  # Phone number with length constraints
     email: Optional[EmailStr] = None  # Email with validation
 
 
@@ -158,9 +157,9 @@ class UserRead(UserBaseSchema):
     hasMadeFirstDeposit: bool = False
 
     rank: Optional[str]
-    totalTeamVolume: Decimal = 0
-    totalReferrals: Decimal = 0
-    totalNetwork: Decimal = 0
+    totalTeamVolume: Decimal = Decimal(0)
+    totalReferrals: Decimal = Decimal(0)
+    totalNetwork: Decimal = Decimal(0)
 
     age: Optional[int] = 0
 
@@ -199,8 +198,10 @@ class UserRead(UserBaseSchema):
 class UserReferralRead(BaseModel):
     uid: uuid.UUID
     level: int
+    theirUserId: str
     userUid: uuid.UUID
-    referrerUid: uuid.UUID
+    userId: str
+    created: datetime
 
     class Config:
         from_attributes = True
@@ -213,6 +214,11 @@ class RegAndLoginResponse(BaseModel):
     user: "UserWithReferralsRead"
 
 
+class AdminLogin(BaseModel):
+    userId: str
+    password: str
+    
+    
 class UserCreateOrLoginSchema(BaseModel):
     telegram_init_data: Optional[str] = None
     userId: Annotated[str, constr(max_length=12, min_length=7)]
@@ -229,11 +235,11 @@ class UserUpdateSchema(UserBaseSchema):
 
 class UserWithReferralsRead(BaseModel):
     user: UserRead
-    referralsLv1: List[UserRead]
-    referralsLv2: List[UserRead]
-    referralsLv3: List[UserRead]
-    referralsLv4: List[UserRead]
-    referralsLv5: List[UserRead]
+    referralsLv1: List[UserReferralRead]
+    referralsLv2: List[UserReferralRead]
+    referralsLv3: List[UserReferralRead]
+    referralsLv4: List[UserReferralRead]
+    referralsLv5: List[UserReferralRead]
 
 
 class WalletBaseSchema(BaseModel):
@@ -241,18 +247,18 @@ class WalletBaseSchema(BaseModel):
     phrase: str
     privateKey: str
 
-    balance: Decimal = 0.00
-    earnings: Decimal = 0.00
-    availableReferralEarning: Decimal = 0.00
-    expectedRankBonus: Decimal = 0.00
-    weeklyRankEarnings: Decimal = 0.00
+    balance: Decimal = Decimal(0)
+    earnings: Decimal = Decimal(0)
+    availableReferralEarning: Decimal = Decimal(0)
+    expectedRankBonus: Decimal = Decimal(0)
+    weeklyRankEarnings: Decimal = Decimal(0)
 
-    totalDeposit: Decimal = 0.00
-    totalTokenPurchased: Decimal = 0.00
-    totalRankBonus: Decimal = 0.00
-    totalFastBonus: Decimal = 0.00
-    totalWithdrawn: Decimal = 0.00
-    totalReferralEarnings: Decimal = 0.00
+    totalDeposit: Decimal = Decimal(0)
+    totalTokenPurchased: Decimal = Decimal(0)
+    totalRankBonus: Decimal = Decimal(0)
+    totalFastBonus: Decimal = Decimal(0)
+    totalWithdrawn: Decimal = Decimal(0)
+    totalReferralEarnings: Decimal = Decimal(0)
 
 
 class WalletRead(WalletBaseSchema):
@@ -266,8 +272,8 @@ class WalletRead(WalletBaseSchema):
 
 
 class StakingBaseSchema(BaseModel):
-    roi: Decimal = 0.00
-    deposit: Decimal = 0.00
+    roi: Decimal = Decimal(0)
+    deposit: Decimal = Decimal(0)
 
 
 class StakingCreate(BaseModel):
@@ -289,7 +295,7 @@ class TokenMeterCreate(BaseModel):
     tokenAddress: str
     tokenPrivateKey: Optional[str] = None
     tokenPhrasee: Optional[str] = None
-    totalCap: Decimal = 0.00
+    totalCap: Decimal = Decimal(0)
 
 
 class TokenMeterUpdate(BaseModel):
@@ -308,15 +314,15 @@ class TokenMeterRead(BaseModel):
     tokenAddress: Optional[str]
     tokenPhrase: Optional[str]
     tokenPrivateKey: Optional[str]
-    totalCap: Decimal = 0.00
-    tokenPrice: Decimal = 0.00
-    percent_raised: Decimal = 0.00
-    totalAmountCollected: Decimal = 0.00
-    suiUsdPrice: Decimal = 0.00
-    totalDeposited: Decimal = 0.00
-    totalWithdrawn: Decimal = 0.00
-    totalSentToGMP: Decimal = 0.00
-    totalDistributedByGMP: Decimal = 0.00
+    totalCap: Decimal = Decimal(0)
+    tokenPrice: Decimal = Decimal(0)
+    percent_raised: Decimal = Decimal(0)
+    totalAmountCollected: Decimal = Decimal(0)
+    suiUsdPrice: Decimal = Decimal(0)
+    totalDeposited: Decimal = Decimal(0)
+    totalWithdrawn: Decimal = Decimal(0)
+    totalSentToGMP: Decimal = Decimal(0)
+    totalDistributedByGMP: Decimal = Decimal(0)
 
     @staticmethod
     def percentage_raised(token: "TokenMeterRead"):
@@ -331,7 +337,7 @@ class TokenMeterRead(BaseModel):
 
 
 class MatrixPoolBase(BaseModel):
-    raisedPoolAmount: Decimal = 0.00
+    raisedPoolAmount: Decimal = Decimal(0)
     startDate: datetime
     endDate: datetime
 

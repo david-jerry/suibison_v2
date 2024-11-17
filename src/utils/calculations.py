@@ -12,7 +12,7 @@ async def get_rank(tteamVolume: Decimal, tdeposit: Decimal, referrals: List[User
     rank = None
     
     teamVolume = tteamVolume * Decimal(usd__price)
-    deposit = tdeposit * Decimal(usd__price)
+    deposit = Decimal(tdeposit) * Decimal(usd__price)
     
     if teamVolume >= Decimal(1000) and teamVolume < Decimal(5000) and deposit >= Decimal(50) and deposit < Decimal(100) and len(referrals) >= 3:
         rankEarnings = Decimal(25)

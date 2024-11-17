@@ -21,11 +21,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.apps.accounts.dependencies import user_exists_check
 from src.apps.accounts.enum import ActivityType
 from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
-from src.apps.accounts.schemas import ActivitiesRead, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema
+from src.apps.accounts.schemas import ActivitiesRead, AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
-from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
-from src.utils.hashing import createAccessToken, verifyTelegramAuthData
+from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
+from src.utils.hashing import createAccessToken, verifyHashKey, verifyTelegramAuthData
 from src.utils.logger import LOGGER
 from src.config.settings import Config
 from src.db.redis import add_level_referral, get_level_referrers, get_sui_usd_price
@@ -183,25 +183,31 @@ class AdminServices:
     
     
 class UserServices:
-    async def create_referral_level(self, user: User, referral_userId: str, level: int, session: AsyncSession):
+    async def create_referral_level(self, new_user: User, referring_user: User, level: int, session: AsyncSession):
+        referrer = referring_user
+        
         if level < 6:
-            user.totalNetwork += 1
-            user.totalReferrals += 1 if level == 1 else 0
+            referrer.totalNetwork += 1
+            referrer.totalReferrals += 1 if level == 1 else 0
             
             new_referral = UserReferral(
                 level=level,
-                userUid=user.uid,
-                referrerUid=referral_userId,
+                theirUserId=new_user.userId,
+                userUid=new_user.uid,
+                userId=referrer.userId,
             )
             session.add(new_referral)
-            session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=user.uid))
+            session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=referrer.uid))
             # await session.commit()            
-            await self.create_referral_level(user.referrer, referral_userId, level + 1, session)
+            if referring_user.referrer is not None:
+                db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
+                referrers_referrer = db_result.first()
+                await self.create_referral_level(new_user, referrers_referrer, level + 1, session)
         return None
     
-    async def create_referrer(self, referrer: Optional[str], new_user: User, session: AsyncSession):
-        if referrer is not None:                
-            db_result = await session.exec(select(User).where(User.userId == referrer))
+    async def create_referrer(self, referrer_userId: Optional[str], new_user: User, session: AsyncSession):
+        if referrer_userId is not None:                
+            db_result = await session.exec(select(User).where(User.userId == referrer_userId))
             referring_user = db_result.first()
             
             # Save the referral level down to the 5th level in redis for improved performance
@@ -209,7 +215,7 @@ class UserServices:
                 raise ReferrerNotFound()
 
             fast_boost_time = referring_user.joined + timedelta(hours=24)
-            db_referrals = await session.exec(select(UserReferral).where(UserReferral.userUid == referring_user.uid).where(UserReferral.level == 1))
+            db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
             referrals = db_referrals.all()
             
             # check for fast boost and credit the users wallet balance accordingly
@@ -217,7 +223,7 @@ class UserServices:
                 referring_user.wallet.totalFastBonus += Decimal(3.00)
                 referring_user.wallet.balance += Decimal(3.00)
                                 
-            self.create_referral_level(referring_user, new_user.userId, 1, session)
+            await self.create_referral_level(new_user, referring_user, 1, session)
         return None
                 
     async def add_referrer_earning(self, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
@@ -225,25 +231,25 @@ class UserServices:
             db_result = await session.exec(select(User).where(User.userId == referrer))
             user = db_result.first()
             
-            percentage = 0.1
+            percentage = Decimal(0.1)
             if level == 2:
-                percentage = 0.05
+                percentage = Decimal(0.05)
             elif level == 3:
-                percentage = 0.03
+                percentage = Decimal(0.03)
             elif level == 4:
-                percentage = 0.02
+                percentage = Decimal(0.02)
             elif level == 5:
-                percentage = 0.01
+                percentage = Decimal(0.01)
                 
             
             # Save the referral level down to the 5th level in redis for improved performance
             if user is not None:
                 user.wallet.earnings += percentage * amount
                 user.totalTeamVolume += amount
-                ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=(percentage * amount), userId=referrer)
+                ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userId=referrer)
                 session.add(ref_activity)
                 if level < 6:
-                    return self.add_referrer_earning(user.referrer.user.userId, amount, level + 1, session)
+                    return self.add_referrer_earning(user.referrer.userId, amount, level + 1, session)
         return None
                 
     async def create_wallet(self, user: User, session: AsyncSession):
@@ -294,8 +300,12 @@ class UserServices:
         session.add(user)
         return None
 
-    async def authenticate_user(self, userId: str, session):
-        user = await user_exists_check(userId, session)
+    async def authenticate_user(self, form_data: AdminLogin, session):     
+        user = await user_exists_check(form_data.userId, session)
+        
+        valid_password = verifyHashKey(form_data.password, user.passwordHash)
+        if not valid_password:
+            raise InvalidCredentials()
                 
         # check if the user is blocked
         if user is not None and user.isBlocked:
@@ -322,7 +332,7 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
-    async def register_new_user(self, admin: bool, referrer: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
+    async def register_new_user(self, admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
         if not verifyTelegramAuthData(form_data.telegram_init_data):
             raise InvalidTelegramAuthData()
@@ -347,8 +357,8 @@ class UserServices:
             new_wallet = await self.create_wallet(user, session)
             LOGGER.debug(f"NEW WALLET:: {new_wallet}")
             
-            if referrer is not None:
-                await self.create_referrer(referrer, user, session)
+            if referrer_userId is not None:
+                await self.create_referrer(referrer_userId, user, session)
 
             await session.commit()
             await session.refresh(user)
@@ -568,7 +578,7 @@ class UserServices:
             # Check if first time staking then add the bonuses to the referrals
             if not user.hasMadeFirstDeposit:
                 # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
-                await self.add_referrer_earning(user.referrer.user.userId, amount, 1, session)
+                await self.add_referrer_earning(user.referrer.userId, amount, 1, session)
 
             new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
             session.add(new_activity)

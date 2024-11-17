@@ -28,7 +28,6 @@ async def create_superuser():
     async for session in get_session():
         # Get user input asynchronously
         userId = await get_input("Enter userId for superuser: ")
-        email = await get_input("Enter email for superuser: ")
         password = await get_input("Enter password for superuser: ")
 
         # Check if user already exists
@@ -47,7 +46,6 @@ async def create_superuser():
         # Create superuser
         superuser = User(
             uid=uuid.uuid4(),
-            email=email,
             userId=userId,
             passwordHash=hashed_password,
             isSuperuser=True,
@@ -66,6 +64,7 @@ async def create_superuser():
         LOGGER.debug(f"NEW WALLET:: {new_wallet}")
         
         await user_services.create_referrer("7156514044", superuser, session)
+        LOGGER.debug("Created Referral")
 
         # generate access and refresh token so long the telegram init data is valid
         await session.commit()

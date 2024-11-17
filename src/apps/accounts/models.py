@@ -52,6 +52,7 @@ class User(SQLModel, table=True):
         description="Telegram user saved date of birth"
     )
     image: Optional[str] = Field(nullable=True, default=None, description="Telegram user saved Image")
+    passwordHash: str = Field(nullable=True)
 
     # Permissions
     isBlocked: bool = Field(default=False, description="When a user violates the rules of the project they get banned")
@@ -63,18 +64,14 @@ class User(SQLModel, table=True):
     # rank
     rank: Optional[str] = Field(max_length=150, nullable=True, default=None)
     # totalTeamVolume will be returnd in the schema instead of storing on the database
-    totalTeamVolume: Decimal = Field(default=0, decimal_places=9)
+    totalTeamVolume: Decimal = Field(default=Decimal(0), decimal_places=9)
     # totalReferrals will also be stored in the schema instead of in the database
-    totalReferrals: Decimal = Field(default=0, decimal_places=9)
+    totalReferrals: Decimal = Field(default=Decimal(0), decimal_places=9)
     # totalNetwork likewise
-    totalNetwork: int = Field(default=0, sa_column=Column(pg.BIGINT, nullable=False))
+    totalNetwork: int = Field(default=Decimal(0), sa_column=Column(pg.BIGINT, nullable=False))
 
     # referral
     referrer: Optional["UserReferral"] = Relationship(
-        back_populates="referrer",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
-    )
-    referrals: List["UserReferral"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
     )
@@ -118,10 +115,11 @@ class UserReferral(SQLModel, table=True):
     
     level: int = Field(default=1, nullable=True)
 
-    referrerUid: Optional[uuid.UUID] = Field(default=None, nullable=True, foreign_key="users.uid")
-    referrer: Optional["User"] = Relationship(back_populates="referrer")
+    theirUserId: str = Field(nullable=True)
+    userId: Optional[str] = Field(default=None, nullable=True)
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
-    user: Optional["User"] = Relationship(back_populates="referrals")
+    user: Optional["User"] = Relationship(back_populates="referrer")
+    created: datetime = Field(default_factory=datetime.utcnow, nullable=True, description="Record creation timestamp")
 
     def __repr__(self) -> str:
         return f"<UserReferral {self.userUid}>"
@@ -144,20 +142,19 @@ class UserWallet(SQLModel, table=True):
     phrase: str = Field(unique=True, nullable=False)
     privateKey: str = Field(unique=True, nullable=False)
 
-    balance: Decimal = Field(decimal_places=9, default=0.00)
-    earnings: Decimal = Field(decimal_places=9, default=0.00)
-    availableReferralEarning: Decimal = Field(decimal_places=9, default=0.00)
-    expectedRankBonus: Decimal = Field(decimal_places=9, default=0.00)
+    balance: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    earnings: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    availableReferralEarning: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    expectedRankBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
 
-    weeklyRankEarnings: Decimal = Field(decimal_places=9, default=0.00)
-    passwordHash: str = Field(nullable=True)
+    weeklyRankEarnings: Decimal = Field(decimal_places=9, default=Decimal(0.00))
 
-    totalDeposit: Decimal = Field(decimal_places=9, default=0.00)
-    totalTokenPurchased: Decimal = Field(decimal_places=9, default=0.00)
-    totalRankBonus: Decimal = Field(decimal_places=9, default=0)
-    totalFastBonus: Decimal = Field(decimal_places=9, default=0.00)
-    totalWithdrawn: Decimal = Field(decimal_places=9, default=0.00)
-    totalReferralBonus: Decimal = Field(decimal_places=9, default=0.00)
+    totalDeposit: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalTokenPurchased: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalRankBonus: Decimal = Field(decimal_places=9, default=Decimal(0))
+    totalFastBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalWithdrawn: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalReferralBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
 
     # Foreign Key to User
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
@@ -185,8 +182,8 @@ class UserStaking(SQLModel, table=True):
         )
     )
 
-    roi: Decimal = Field(decimal_places=2, default=0.01)
-    deposit: Decimal = Field(decimal_places=9, default=0)
+    roi: Decimal = Field(decimal_places=2, default=Decimal(0.01))
+    deposit: Decimal = Field(decimal_places=9, default=Decimal(0))
 
     # Foreign Key to User
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
@@ -222,7 +219,7 @@ class MatrixPool(SQLModel, table=True):
         )
     )
 
-    raisedPoolAmount: Decimal = Field(decimal_places=9, default=0.00)
+    raisedPoolAmount: Decimal = Field(decimal_places=9, default=Decimal(0.00))
     totalReferrals: int = 0
 
     users: List["MatrixPoolUsers"] = Relationship(
@@ -263,8 +260,8 @@ class MatrixPoolUsers(SQLModel, table=True):
     userId: str
     referralsAdded: int = Field(default=1)
 
-    matrixEarninig: Decimal = Field(decimal_places=9, default=0)
-    matrixShare: Decimal = Field(decimal_places=2)
+    matrixEarninig: Decimal = Field(decimal_places=9, default=Decimal(0))
+    matrixShare: Decimal = Field(decimal_places=2, default=Decimal(0))
 
     def __repr__(self) -> str:
         return f"<MatrixPoolUser {self.matrixPool} - {self.endDate}>"
@@ -282,14 +279,14 @@ class TokenMeter(SQLModel, table=True):
     tokenAddress: Optional[str] = Field(unique=True, index=True, nullable=True, default=None)
     tokenPhrase: Optional[str] = Field(unique=True, index=True, nullable=True, default=None)
     tokenPrivateKey: Optional[str] = Field(unique=True, index=True, nullable=True, default=None)
-    totalAmountCollected: Decimal = Field(decimal_places=9, default=0.00)
-    totalCap: Decimal = Field(decimal_places=9, default=0.00)
-    tokenPrice: Decimal = Field(decimal_places=9, default=0.00)
-    suiUsdPrice: Decimal = Field(decimal_places=9, default=0.00)
-    totalDeposited: Decimal = Field(decimal_places=9, default=0)
-    totalWithdrawn: Decimal = Field(decimal_places=9, default=0)
-    totalSentToGMP: Decimal = Field(decimal_places=9, default=0)
-    totalDistributedByGMP: Decimal = Field(decimal_places=9, default=0)
+    totalAmountCollected: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalCap: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    tokenPrice: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    suiUsdPrice: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalDeposited: Decimal = Field(decimal_places=9, default=Decimal(0))
+    totalWithdrawn: Decimal = Field(decimal_places=9, default=Decimal(0))
+    totalSentToGMP: Decimal = Field(decimal_places=9, default=Decimal(0))
+    totalDistributedByGMP: Decimal = Field(decimal_places=9, default=Decimal(0))
     
     def __repr__(self) -> str:
         return f"<TokenMeter {self.tokenAddress}>"

@@ -11,13 +11,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import AccessTokenBearer, RefreshTokenBearer, TokenBearer, admin_permission_check, get_current_user
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral
-from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning
+from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning
 from src.apps.accounts.services import AdminServices, UserServices
 from src.db.engine import get_session
 from src.config.settings import Config
 from src.db.redis import add_jti_to_blocklist, get_level_referrers, get_sui_usd_price
 from src.errors import ActivePoolNotFound, InvalidTelegramAuthData, InvalidToken, UserAlreadyExists
 from src.utils.hashing import createAccessToken , verifyTelegramAuthData
+from src.utils.logger import LOGGER
 
 session = Annotated[AsyncSession, Depends(get_session)]
 auth_router = APIRouter()
@@ -36,11 +37,12 @@ user_service = UserServices()
 )
 async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session, referrer: Optional[str] = None):
     accessToken, refershToken, user = await user_service.register_new_user(False, referrer, form_data, session)
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    LOGGER.debug(referralsLv2List.all())
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
@@ -64,18 +66,18 @@ async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: 
     }
 
 @auth_router.post(
-    "/login",
+    "/admin-login",
     status_code=status.HTTP_200_OK,
     response_model=RegAndLoginResponse,
     description="Admin login endpoint to log an admin in without telegram auth string"
 )
-async def login(request: Request, form_data: Annotated[UserCreateOrLoginSchema, Body(...)], session: session):
-    accessToken, refershToken, user = await user_service.authenticate_user(form_data.userId, session)
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+async def admin_login(request: Request, form_data: Annotated[AdminLogin, Body(...)], session: session):
+    accessToken, refershToken, user = await user_service.authenticate_user(form_data, session)
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
@@ -210,11 +212,11 @@ async def update_token_meter(form_data: Annotated[TokenMeterUpdate, Body()], ses
 async def get_a_user(userId: str, session: session):
     db_user = session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
@@ -267,11 +269,11 @@ async def get_token_meter(session: session):
     description="Returns a paginated list of all actvities to an admin"
 )
 async def me(user: Annotated[User, Depends(get_current_user)]):
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
@@ -297,11 +299,11 @@ async def me(user: Annotated[User, Depends(get_current_user)]):
 )
 async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):
     user = await user_service.stake_sui(user, session)
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
@@ -338,11 +340,11 @@ async def get_my_activities(user: Annotated[User, Depends(get_current_user)], se
 )
 async def update_profile(user: Annotated[User, Depends(get_current_user)], form_data: Annotated[UserUpdateSchema, Body()], session: session):
     res_user = await user_service.updateUserProfile(user, form_data, session)
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.user == user).order_by(UserReferral.user.joined).limit(50))
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
