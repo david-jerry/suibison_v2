@@ -137,6 +137,11 @@ class TokenMeterDoesNotExists(SuiBisonException):
     pass
 
 
+class StakingExpired(SuiBisonException):
+    """The staking has expired its session"""
+    pass
+
+
 # Exception handler generator
 def create_exception_handler(
     status_code: int, initial_detail: Any
@@ -203,6 +208,13 @@ def register_all_errors(app: FastAPI):
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"message": "Token is invalid.", "error_code": "invalid_token"}
+        )
+        
+    @app.exception_handler(StakingExpired)
+    async def StakingExpiredError(exc: StakingExpired):
+        return JSONResponse(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            content={"message": "The staking balance toping has expired. Please do not be troubled and whatever has been deposited within your wallet would be reflected.", "error_code": "timed_out"}
         )
         
     @app.exception_handler(IncorrectScheduleDuration)

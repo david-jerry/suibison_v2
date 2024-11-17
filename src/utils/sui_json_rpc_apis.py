@@ -27,7 +27,7 @@ class SUIRequests:
         pkECDSAKey = ecdsa.SigningKey.from_string(pkBytes, curve=ecdsa.SECP256k1)
         signature = pkECDSAKey.sign(digest, hashfunc=hashlib.blake2b, sigencode=ecdsa.util.sigencode_string)
         
-        flag = b"\x01"
+        flag = b"0x01"
         serialized_sig = flag + signature + pubKey
         return serialized_sig
         

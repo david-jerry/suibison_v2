@@ -24,7 +24,7 @@ from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, To
 from src.apps.accounts.schemas import ActivitiesRead, AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
-from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
+from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, StakingExpired, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
 from src.utils.hashing import createAccessToken, verifyHashKey, verifyTelegramAuthData
 from src.utils.logger import LOGGER
 from src.config.settings import Config
@@ -539,7 +539,7 @@ class UserServices:
         user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
         return None
 
-    async def stake_sui(self, user: User, session: AsyncSession):
+    async def stake_sui(self, user: User, session: AsyncSession, expires: Optional[datetime] = None):
         # user has to successfuly transfer into this wallet account then we 
         # first check for them to confirm the transfer is successful
         # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
@@ -547,6 +547,10 @@ class UserServices:
         amount: Decimal = Decimal(coin_balance.coinObjectCount / 10**9)
         db_token_meter = await session.exec(select(TokenMeter))
         token_meter = db_token_meter.first()
+        
+        expiry_set = expires
+        if expires is None:
+            expiry_set = now + timedelta(minutes=15)
 
         amount_to_show = amount - (amount * Decimal(0.1))
         sbt_amount = Decimal(coin_balance.coinObjectCount / 10**9) * Decimal(0.1)
@@ -556,8 +560,20 @@ class UserServices:
         token_meter.totalDeposited += amount
 
         # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
-        if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
-            raise InsufficientBalance()
+
+        try:
+            if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
+                user.staking.deposit += amount_to_show
+                raise InsufficientBalance()
+        except InsufficientBalance:
+            if expiry_set < datetime.now():
+                await session.commit()
+                await session.refresh(user)
+                raise StakingExpired()
+            coin_balance = await SUI.getBalance(user.wallet.address)
+            if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
+                raise InsufficientBalance()
+            
         
         # update the token gannered
         await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
