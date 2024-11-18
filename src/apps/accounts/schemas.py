@@ -18,8 +18,16 @@ class Message(BaseModel):
     error_code: str
 
 
+class Withdrawal(BaseModel):
+    wallet: str
+    
+    
 class DeleteMessage(BaseModel):
     message: str
+    
+    
+class SignedTTransactionBytesMessage(BaseModel):
+    txBytes: Optional[str] = None
 
 
 class AccessToken(BaseModel):
@@ -198,6 +206,8 @@ class UserRead(UserBaseSchema):
 class UserReferralRead(BaseModel):
     uid: uuid.UUID
     level: int
+    name: Optional[str]
+    reward: Optional[Decimal] = Decimal(0.00)
     theirUserId: str
     userUid: uuid.UUID
     userId: str
@@ -285,7 +295,7 @@ class StakingRead(StakingBaseSchema):
 
     start: Optional[datetime]
     end: Optional[datetime]
-    # nextRoiIncrease: datetime
+    nextRoiIncrease: Optional[datetime]
 
     class Config:
         from_attributes = True  # Allows loading from ORM models like SQLModel

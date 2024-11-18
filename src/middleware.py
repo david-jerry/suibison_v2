@@ -26,7 +26,7 @@ def register_middleware(app: FastAPI):
             return RedirectResponse(url=f"/{Config.VERSION}")
 
         response = await call_next(request)
-        LOGGER.debug(pprint.pprint(response, indent=4, depth=4))
+        # LOGGER.debug(pprint.pprint(response, indent=4, depth=4))
         processing_time = time.time() - start_time
 
         host = request.client.host

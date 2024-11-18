@@ -4,6 +4,7 @@ from typing import List
 import base64
 import hashlib
 import asyncio
+import nacl.signing
 import requests
 
 from src.apps.accounts.models import User
@@ -12,23 +13,32 @@ from src.config.settings import Config
 from src.utils.logger import LOGGER
 from sui_python_sdk.wallet import SuiWallet
 import ecdsa
+import nacl
 
 class SUIRequests:
     def __init__(self, url: str = Config.SUI_RPC) -> None:
         self.url = url
         self.decimals = 10**9
                 
-    async def sign_transaction(self, txBytes: bytes, pk: str, pubKey: bytes):
-        hasher = hashlib.blake2b(digest_size=32)
-        hasher.update(txBytes)
+    async def sign_transaction(self, txBytes: str, pk: bytes, pubKey: bytes):
+        bytesTx = base64.b64decode(txBytes)
+        hasher = hashlib.blake2b(bytesTx, digest_size=32)
         digest = hasher.digest()
+        LOGGER.debug(f"txBytes Digest: {base64.b64encode(digest).decode()}")
         
-        pkBytes = bytes.fromhex(pk)
-        pkECDSAKey = ecdsa.SigningKey.from_string(pkBytes, curve=ecdsa.SECP256k1)
+        scheme = pubKey[0:1]
+        curve = ecdsa.SECP256k1
+        if scheme == "\x00":
+            curve = ecdsa.Ed25519
+        pkECDSAKey = ecdsa.SigningKey.from_string(pk, curve=curve)
         signature = pkECDSAKey.sign(digest, hashfunc=hashlib.blake2b, sigencode=ecdsa.util.sigencode_string)
+        # signature = nacl.signing.SigningKey(pk).sign(digest)[:64]
+        LOGGER.debug(f"PubKey: {pubKey[0:1]}")
+        # LOGGER.debug(f"PrivKey: {hashlib.blake2b(pk, digest_size=32).hexdigest()}")
+        LOGGER.debug(signature)
         
-        flag = b"0x01"
-        serialized_sig = flag + signature + pubKey
+        flag = b"\x00"
+        serialized_sig = flag + signature + pubKey[1:]
         return serialized_sig
         
         
@@ -105,14 +115,14 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: int, coinId: str):
+    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: int, coinIds: List[str]):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_paySui",
             "params": [
                 address,
-                [coinId],
+                coinIds,
                 [recipient],
                 [str(amount)],
                 str(gas_budget)
@@ -125,19 +135,20 @@ class SUIRequests:
             result = response.json()
             if 'error' in result:
                 raise Exception(f"Error: {result['error']}")
+            LOGGER.debug(pprint.pprint(result, indent=4))
             res = result["result"]
             return SuiTransferResponse(**res)
         else:
             response.raise_for_status()
         
-    async def payAllSui(self, address: str, recipient: str, gas_budget: int, coinId: str):
+    async def payAllSui(self, address: str, recipient: str, gas_budget: int, coinIds: List[str]):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_payAllSui",
             "params": [
                 address,
-                [coinId],
+                coinIds,
                 [recipient],
                 str(gas_budget)
             ]
@@ -179,19 +190,21 @@ class SUIRequests:
     async def executeTransaction(self, bcsTxBytes: str, phrase: str):
         # NOTE WORK ON THIS TO DETERMINE THE SIGNER
         my_wallet = SuiWallet(mnemonic=phrase)
-        pk = my_wallet.private_key.hex()
         txBytes = base64.b64decode(bcsTxBytes)
-        signatuure = await self.sign_transaction(txBytes, pk, my_wallet.public_key)
+        signatuure = await self.sign_transaction(txBytes, my_wallet.private_key, my_wallet.public_key)
         pub_key = base64.b64encode(my_wallet.public_key).decode()
+        priv_key = base64.b64encode(my_wallet.private_key).decode()
+        signature = base64.b64encode(signatuure).decode()
         LOGGER.debug(f"signatuure: {base64.b64encode(signatuure).decode()}")
-        LOGGER.debug(f"pub_key: {pub_key}")
+        LOGGER.debug(f"pub_key: {my_wallet.public_key}")
+        LOGGER.debug(f"peiv_key: {priv_key}")
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "sui_executeTransactionBlock",
             "params": [
                 bcsTxBytes,
-                [signatuure]
+                [signature]
             ]
         }
         response = await asyncio.to_thread(requests.post, self.url, json=payload)

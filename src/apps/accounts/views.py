@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Annotated, List, Optional
 import uuid
 
@@ -11,7 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import AccessTokenBearer, RefreshTokenBearer, TokenBearer, admin_permission_check, get_current_user
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral
-from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning
+from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, SignedTTransactionBytesMessage, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning, Withdrawal
 from src.apps.accounts.services import AdminServices, UserServices
 from src.db.engine import get_session
 from src.config.settings import Config
@@ -294,32 +295,24 @@ async def me(user: Annotated[User, Depends(get_current_user)], session: session)
 @user_router.post(
     "/me/stake",
     status_code=status.HTTP_201_CREATED,
-    response_model=UserWithReferralsRead,
+    response_model=SignedTTransactionBytesMessage,
     dependencies=[Depends(get_current_user)],
     description="Initiates a stake and staarts the countdown to a 100days"
 )
 async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):    
-    user = await user_service.stake_sui(user, session)
-    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
-    referralsLv1 = referralsLv1List.all()
-    referralsLv2 = referralsLv2List.all()
-    referralsLv3 = referralsLv3List.all()
-    referralsLv4 = referralsLv4List.all()
-    referralsLv5 = referralsLv5List.all()
-    
-    return {
-        "user": user, 
-        "referralsLv1": referralsLv1,
-        "referralsLv2": referralsLv2,
-        "referralsLv3": referralsLv3,
-        "referralsLv4": referralsLv4,
-        "referralsLv5": referralsLv5,
-    }
+    txBytes = await user_service.stake_sui(user, session)
+    return txBytes
+
+@user_router.post(
+    "/me/withdraw",
+    status_code=status.HTTP_201_CREATED,
+    response_model=SignedTTransactionBytesMessage,
+    dependencies=[Depends(get_current_user)],
+    description="Initiates a withdrawal from the users earning"
+)
+async def withdraw_from_earning(wallet: Annotated[Withdrawal, Body(...)], user: Annotated[User, Depends(get_current_user)], session: session):    
+    txBytes = await user_service.withdrawToUserWallet(user, wallet, session)
+    return txBytes
 
 @user_router.get(
     "/me/activities",

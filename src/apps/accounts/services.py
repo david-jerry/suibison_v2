@@ -1,3 +1,4 @@
+import asyncio
 from decimal import Decimal
 import pprint
 import random
@@ -192,6 +193,8 @@ class UserServices:
             
             new_referral = UserReferral(
                 level=level,
+                name=f"{new_user.firstName} {new_user.lastName}" if new_user.firstName or new_user.lastName else f"{referrer.firstName} Referral - {new_user.userId}",
+                reward=Decimal(0.00),
                 theirUserId=new_user.userId,
                 userUid=new_user.uid,
                 userId=referrer.userId,
@@ -226,7 +229,7 @@ class UserServices:
             await self.create_referral_level(new_user, referring_user, 1, session)
         return None
                 
-    async def add_referrer_earning(self, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
+    async def add_referrer_earning(self, referralUid: uuid.UUID, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
         if referrer is not None:                
             db_result = await session.exec(select(User).where(User.userId == referrer))
             user = db_result.first()
@@ -246,10 +249,13 @@ class UserServices:
             if user is not None:
                 user.wallet.earnings += percentage * amount
                 user.totalTeamVolume += amount
+                db_res = await session.exec(select(UserReferral).where(UserReferral.userUid == referralUid).where(UserReferral.userId == referrer))
+                the_referred_user = db_res.first()
+                the_referred_user.reward = percentage * amount
                 ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userId=referrer)
                 session.add(ref_activity)
                 if level < 6:
-                    return self.add_referrer_earning(user.referrer.userId, amount, level + 1, session)
+                    return self.add_referrer_earning(referralUid, user.referrer.userId, amount, level + 1, session)
         return None
                 
     async def create_wallet(self, user: User, session: AsyncSession):
@@ -332,6 +338,24 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
+    async def sendWelcomeMessage(self, user: User):
+        from telegram import Bot
+        from telegram.constants import ParseMode
+        
+        bot = Bot(Config.TELEGRAM_TOKEN)
+        message = f"""
+Welcome {user.userId},
+
+We are excited to have you onboard SUI-Bison, we hope the experience you get from our platform can be shared at no cost to others to help keep the community alive.
+
+However, Please be aware that there is a minimum deposit amount to initiate a stake.
+<strong>Min Stake: 3.01 SUI</strong>
+
+Team SUI-Bison
+        """
+        await bot.send_message(chat_id=user.userId, text=message, parse_mode=ParseMode.HTML)
+        return None
+
     async def register_new_user(self, admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
         if not verifyTelegramAuthData(form_data.telegram_init_data):
@@ -359,6 +383,8 @@ class UserServices:
             
             if referrer_userId is not None:
                 await self.create_referrer(referrer_userId, user, session)
+                
+            await self.sendWelcomeMessage(user)
 
             await session.commit()
             await session.refresh(user)
@@ -407,7 +433,11 @@ class UserServices:
         for k, v in form_dict.items():
             if v is not None:
                 setattr(user, k, v)
-                
+
+        db_res = await session.exec(select(UserReferral).where(UserReferral.user.userId == user.userId))
+        the_referred_user = db_res.first()
+        the_referred_user.name = f"{form_data.firstName} {form_data.lastName}" if form_data.firstName or form_data.lastName else the_referred_user.name
+
         await session.commit()
         await session.refresh(user)
         return user
@@ -432,9 +462,8 @@ class UserServices:
             if coin.coinType == "0x2::sui::SUI":
                 coins.append(coin.coinObjectId)
         try:
-            transResponse = await SUI.payAllSui(user.wallet.address, token_meter.address, 10000, coins)
-            executeTrans = await SUI.executeTransaction(transResponse.txBytes, user.wallet.phrase)
-            return executeTrans.digest
+            transResponse = await SUI.payAllSui(user.wallet.address, token_meter.tokenAddress, 10000, coins)
+            return transResponse.txBytes
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -453,8 +482,7 @@ class UserServices:
                 coins.append(coin.coinObjectId)
         try:
             transResponse = await SUI.paySui(token_meter.tokenAddress, wallet, amount, 10000, coins)
-            executeTrans = await SUI.executeTransaction(transResponse.txBytes, user.wallet.phrase)
-            return executeTrans.digest
+            return transResponse.txBytes
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -466,7 +494,6 @@ class UserServices:
         if token_meter is None:
             raise TokenMeterDoesNotExists()
         
-        usdPrice = await get_sui_usd_price()
         
         # determine that the company's wallet address has sui tokens to transfer to withdrawing user
         coinDetail = await SUI.getCoins(token_meter.tokenAddress)
@@ -495,6 +522,7 @@ class UserServices:
         # invested by the user into the token meter
         token_meter.totalAmountCollected += token_meter_amount
         user.wallet.totalTokenPurchased += token_meter_amount
+        user.wallet.availableReferralEarning = 0.00
         
         # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.staking.deposit += redepositable_amount
@@ -539,6 +567,56 @@ class UserServices:
         user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
         return None
 
+    async def handle_stake_logic(self, expiry_set: datetime, amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
+        """Core logic for handling the staking process."""
+        txBytes = None
+        try:
+            if Decimal(0.001) < amount < Decimal(1):
+                amount_to_show = amount - (amount * Decimal(0.1))
+                sbt_amount = amount * Decimal(0.1)
+
+                # Update SBT records
+                token_meter.totalAmountCollected += sbt_amount
+                token_meter.totalDeposited += amount
+                user.staking.deposit += amount_to_show
+                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+
+                # Handle first-time staking
+                if not user.hasMadeFirstDeposit:
+                    await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
+
+                # Transfer to admin wallet
+                txBytes = await self.transferToAdminWallet(user, session)
+                return False, txBytes, amount_to_show
+            elif amount >= Decimal(1):
+                amount_to_show = amount - (amount * Decimal(0.1))
+                sbt_amount = amount * Decimal(0.1)
+
+                # Update SBT records
+                token_meter.totalAmountCollected += sbt_amount
+                token_meter.totalDeposited += amount
+                user.staking.deposit += amount_to_show
+                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+
+                # Handle first-time staking
+                if not user.hasMadeFirstDeposit:
+                    await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
+
+                # Transfer to admin wallet
+                txBytes = await self.transferToAdminWallet(user, session)
+                return True, txBytes, amount_to_show
+            elif amount < Decimal(0.0001):
+                raise InsufficientBalance()
+        except InsufficientBalance:
+            if expiry_set < datetime.now():
+                raise StakingExpired()
+            
+            # Retry after waiting for 30 seconds
+            await asyncio.sleep(30)
+            coin_balance = await SUI.getBalance(user.wallet.address)
+            amount = Decimal(coin_balance.coinObjectCount / 10**9)
+            await self.handle_stake_logic(expiry_set, amount, token_meter, user, session)
+
     async def stake_sui(self, user: User, session: AsyncSession, expires: Optional[datetime] = None):
         # user has to successfuly transfer into this wallet account then we 
         # first check for them to confirm the transfer is successful
@@ -550,63 +628,29 @@ class UserServices:
         
         expiry_set = expires
         if expires is None:
-            expiry_set = now + timedelta(minutes=15)
+            expiry_set = now + timedelta(minutes=0.7)
 
-        amount_to_show = amount - (amount * Decimal(0.1))
-        sbt_amount = Decimal(coin_balance.coinObjectCount / 10**9) * Decimal(0.1)
-        
-        # update sbt records
-        token_meter.totalAmountCollected += sbt_amount
-        token_meter.totalDeposited += amount
 
-        # Check if user has enough balance to start a stake wiht minimum sui of 3 sui
-        progress = False
+        progress, txBytes, amount_to_show = await asyncio.to_thread(asyncio.run, self.handle_stake_logic(expiry_set, amount, token_meter, user, session))    
         
-        try:
-            if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
-                user.staking.deposit += amount_to_show
-                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
-                raise InsufficientBalance()
-            progress = True
-        except InsufficientBalance:
-            if expiry_set < datetime.now():
-                await session.commit()
-                await session.refresh(user)
-                raise StakingExpired()
-            coin_balance = await SUI.getBalance(user.wallet.address)
-            if Decimal(coin_balance.coinObjectCount / 10**9) < Decimal(3):
-                raise InsufficientBalance()
-            progress = True
-            
-        
-        # update the token gannered
-
         enddate = now + timedelta(days=100)
-        stake = user.staking
+        stake = user.staking           
         
         if progress:
             if stake.end < now:
-                stake.deposit += amount_to_show
-                stake.startedAt = now
-                stake.endingAt = enddate
+                stake.start = now
+                stake.end = enddate
                 stake.nextRoiIncrease = now + timedelta(days=5)
 
                 trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
                 scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
                 scheduler.start()
 
-                # Check if first time staking then add the bonuses to the referrals
-                if not user.hasMadeFirstDeposit:
-                    # NOTE: create a function that checks all the referrals to see if the user's referrals has staked double of the usuers balance to do a speed boost
-                    await self.add_referrer_earning(user.referrer.userId, amount, 1, session)
-
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
-                session.add(new_activity)
-
+                session.add(new_activity)                
             else:
-                stake.deposit += amount_to_show
-                stake.startedAt = now
-                stake.endingAt = enddate
+                stake.start = now
+                stake.end = enddate
                 stake.nextRoiIncrease = now + timedelta(days=5)
                 
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
@@ -618,11 +662,42 @@ class UserServices:
                         
         await session.commit()
         await session.refresh(user)
-        # after successfully topping up stake sui in the user's 
-        # wallet to the admin so it starts afresh from 0 while updating the 
-        # actual system wallet balance
-        # await self.transferToAdminWallet(user, token_meter)
-        return user
+        return txBytes
+    
+    async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
+        """
+        This calculates and updates the interest on a stake until its expiry date.
+
+        Args:
+            session: The database session object.
+            stake: The UserStaking object representing the stake.
+        """
+        now = datetime.now()
+        remaining_days = (stake.end - now).days
+        
+        # loop this task until staking expiry date has reached then stop it
+        if remaining_days > 0:
+            # calculate interest based on remaining days and ensure the roi is less than 4%
+            if stake.roi < Decimal(0.04):
+                if stake.nextRoiIncrease == now:
+                    new_roi = stake.roi + Decimal(0.005)        
+                    stake.roi = new_roi        
+                    interest_earned = stake.deposit * new_roi
+                    user.wallet.earnings += interest_earned                    
+                    stake.nextRoiIncrease = now + timedelta(days=5)
+                user.wallet.earnings += (stake.deposit * stake.roi)
+                
+        if remaining_days == 0 or stake.end <= now:
+            stake.roi = 0.01
+            stake.end = None
+            stake.start = None
+            stake.nextRoiIncrease = None
+            
+        await session.commit()
+        await session.refresh(stake)
+        return None
+        
+
         
 
     

@@ -117,6 +117,8 @@ class UserReferral(SQLModel, table=True):
 
     theirUserId: str = Field(nullable=True)
     userId: Optional[str] = Field(default=None, nullable=True)
+    name: Optional[str] = Field(default=None, nullable=True)
+    reward: Decimal = Field(default=Decimal(0.00), decimal_places=9, nullable=True)
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
     user: Optional["User"] = Relationship(back_populates="referrer")
     created: datetime = Field(default_factory=datetime.utcnow, nullable=True, description="Record creation timestamp")
@@ -197,9 +199,9 @@ class UserStaking(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(pg.TIMESTAMP, default=datetime.utcnow),
     )
-    # nextRoiIncrease: Optional[datetime] = Field(
-    #     sa_column=Column(pg.TIMESTAMP, default=None),
-    # )
+    nextRoiIncrease: Optional[datetime] = Field(
+        sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
+    )
     def __repr__(self) -> str:
         return f"<Stakes {self.user}>"
 
