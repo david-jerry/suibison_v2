@@ -43,9 +43,9 @@ class User(SQLModel, table=True):
     )
 
     userId: str = Field(max_length=12, nullable=False, description="Telegram user ID", index=True)
-    firstName: Optional[str] = Field(max_length=12, nullable=True, default=None, description="Telegram user saved First Name")
-    lastName: Optional[str] = Field(max_length=12, nullable=True, default=None, description="Telegram user saved Last Name")
-    phoneNumber: Optional[str] = Field(max_length=12, nullable=True, default=None, description="Telegram user saved Phone Nmber")
+    firstName: Optional[str] = Field(max_length=255, nullable=True, default=None, description="Telegram user saved First Name")
+    lastName: Optional[str] = Field(max_length=255, nullable=True, default=None, description="Telegram user saved Last Name")
+    phoneNumber: Optional[str] = Field(max_length=14, nullable=True, default=None, description="Telegram user saved Phone Nmber")
     dob: Optional[date] = Field(
         default_factory=None,
         sa_column=Column(pg.DATE, nullable=True, default=None),
@@ -117,7 +117,7 @@ class UserReferral(SQLModel, table=True):
 
     theirUserId: str = Field(nullable=True)
     userId: Optional[str] = Field(default=None, nullable=True)
-    name: Optional[str] = Field(default=None, nullable=True)
+    name: Optional[str] = Field(default=None, nullable=True, max_length=255)
     reward: Decimal = Field(default=Decimal(0.00), decimal_places=9, nullable=True)
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
     user: Optional["User"] = Relationship(back_populates="referrer")

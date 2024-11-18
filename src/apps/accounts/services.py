@@ -434,9 +434,10 @@ Team SUI-Bison
             if v is not None:
                 setattr(user, k, v)
 
-        db_res = await session.exec(select(UserReferral).where(UserReferral.user.userId == user.userId))
+        db_res = await session.exec(select(UserReferral).where(UserReferral.user == user))
         the_referred_user = db_res.first()
-        the_referred_user.name = f"{form_data.firstName} {form_data.lastName}" if form_data.firstName or form_data.lastName else the_referred_user.name
+        if the_referred_user is not None:
+            the_referred_user.name = f"{form_data.firstName} {form_data.lastName}" if form_data.firstName or form_data.lastName else the_referred_user.name
 
         await session.commit()
         await session.refresh(user)
