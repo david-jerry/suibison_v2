@@ -253,8 +253,8 @@ class UserWithReferralsRead(BaseModel):
 
 class WalletBaseSchema(BaseModel):
     address: str
-    phrase: str
-    privateKey: str
+    # phrase: str
+    # privateKey: str
 
     balance: Decimal = Decimal(0)
     earnings: Decimal = Decimal(0)

@@ -675,8 +675,7 @@ class UserServices:
 
                 await session.commit()
                 await session.refresh(stake)
-            
-                        
+
         await session.commit()
         await session.refresh(user)
         return txBytes

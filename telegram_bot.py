@@ -26,7 +26,7 @@ async def start(update: Update, context: CallbackContext):
         import requests
 
         # Define the endpoint URL
-        url = f"http://localhost:8000/v2/auth/start?referrer={startapp_param}&start=yes"
+        url = f"http://sui-bison.live/v2/auth/start?referrer={startapp_param}&start=yes"
 
         # Define the request headers
         headers = {
