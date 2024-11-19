@@ -29,8 +29,9 @@ async def start(update: Update, context: CallbackContext):
 
 
         # Define the endpoint URL
-        url = f"{Config.DOMAIN}/v2/auth/start?referrer={startapp_param}&start=yes" if len(startapp_param) > 0 else f"{Config.DOMAIN}/v2/auth/start"
-
+        url = f"{Config.DOMAIN}/v2/auth/start?referrer={startapp_param}&start=yes" if len(startapp_param) > 0 else f"{Config.DOMAIN}/v2/auth/start?start=yes"
+        LOGGER.debug(url)
+        LOGGER.debug(startapp_param)
         # Define the request headers
         headers = {
             "accept": "application/json",
@@ -54,7 +55,8 @@ async def start(update: Update, context: CallbackContext):
         LOGGER.debug(response)
         await update.message.reply_text(f"Hello  {startapp_param}, \nYou can always return to relaunch the app from the button above or use the launch icon on the bottom left to launch the app and get authenticated", reply_markup=reply_markup)
     else:
-        url = f"{Config.DOMAIN}/v2/auth/start"
+        url = f"{Config.DOMAIN}/v2/auth/start?start=yes"
+        LOGGER.debug(url)
 
         # Define the request headers
         headers = {

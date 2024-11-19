@@ -63,7 +63,7 @@ async def create_superuser():
         new_wallet = await user_services.create_wallet(superuser, session)
         LOGGER.debug(f"NEW WALLET:: {new_wallet}")
         
-        await user_services.create_referrer("7156514044", superuser, session)
+        await user_services.create_referrer("6773082668", superuser, session)
         LOGGER.debug("Created Referral")
 
         # generate access and refresh token so long the telegram init data is valid
