@@ -52,6 +52,9 @@ def register_middleware(app: FastAPI):
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=[
+            "sui-bison.netlify.app",
+            "t.me/sui_bison_bot",
+            "t.me/sui_bison_bot/app",
             "localhost",
             "127.0.0.1",
             "0.0.0.0",

@@ -266,15 +266,16 @@ class UserServices:
     async def create_wallet(self, user: User, session: AsyncSession):
         # mnemonic_phrase = Mnemonic("english").generate(strength=128)
         mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
+        LOGGER.debug(f"Phrase: {mnemonic_phrase.ToStr()}")
         # Generate a new wallet which includes the wallet address and mnemonic phrase
         # seed = Mnemonic.to_seed(mnemonic_phrase)
-        my_wallet = SuiWallet(mnemonic=mnemonic_phrase)
+        my_wallet = SuiWallet(mnemonic=mnemonic_phrase.ToStr())
         my_address = my_wallet.get_address()
         my_private_key = my_wallet.private_key.hex()
         signer = my_wallet.full_private_key
         
         # Save the new wallet in the database
-        new_wallet = UserWallet(address=my_address, phrase=mnemonic_phrase, privateKey=my_private_key, userUid=user.uid)
+        new_wallet = UserWallet(address=my_address, phrase=mnemonic_phrase.ToStr(), privateKey=my_private_key, userUid=user.uid)
         session.add(new_wallet)
         return new_wallet
         
@@ -345,31 +346,6 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
-#     async def sendWelcomeMessage(self, user: User):
-        
-#         bot = Bot(Config.TELEGRAM_TOKEN)
-#         keyboard = [
-#             [
-#                 InlineKeyboardButton(
-#                     text="Launch Mini-App", 
-#                     web_app={"url": Config.WEBAPP_URL}
-#                 )
-#             ]
-#         ]
-#         reply_markup = InlineKeyboardMarkup(keyboard)
-#         message = f"""
-# Welcome {user.userId},
-
-# We are excited to have you onboard SUI-Bison, we hope the experience you get from our platform can be shared at no cost to others to help keep the community alive.
-
-# However, Please be aware that there is a minimum deposit amount to initiate a stake.
-# <strong>Min Stake: 3.01 SUI</strong>
-
-# Team SUI-Bison
-#         """
-#         await bot.send_message(chat_id=user.userId, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-#         return None
-
     async def register_new_user(self, registering: Optional[str], admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
         if registering is None:
@@ -385,6 +361,7 @@ class UserServices:
                 firstName=form_data.firstName,
                 lastName=form_data.lastName,
                 phoneNumber=form_data.phoneNumber,
+                image=form_data.image,
                 isAdmin=admin,
             )
             session.add(user)
