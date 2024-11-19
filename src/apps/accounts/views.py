@@ -36,8 +36,44 @@ user_service = UserServices()
     response_model=RegAndLoginResponse,
     description="Initialize a new webapp instance for a user passing a `telegram_init_data` for authorization check and an `*optional* referrerId`(telegram userId) to create the level authorization. Within this endpoint is the function tto auto generate a unique wallet address and an initial activity record for the new user if it is their first time initializing the webapp else it automatically generates an accesstoken and refreshToken when the user is a returning user."
 )
-async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session, referrer: Optional[str] = None, start: Optional[str] = None):
-    accessToken, refershToken, user = await user_service.register_new_user(start, False, referrer, form_data, session)
+async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session, referrer: Optional[str] = None):
+    accessToken, refershToken, user = await user_service.register_new_user(referrer, form_data, session)
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    LOGGER.debug(referralsLv2List.all())
+    
+    referralsLv1 = referralsLv1List.all()
+    referralsLv2 = referralsLv2List.all()
+    referralsLv3 = referralsLv3List.all()
+    referralsLv4 = referralsLv4List.all()
+    referralsLv5 = referralsLv5List.all()
+
+    userResp = {
+        "user": user,
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5
+    }
+    return {
+        "message": "Authorization Successful", 
+        "accessToken": accessToken, 
+        "refreshToken": refershToken, 
+        "user": userResp
+    }
+
+@auth_router.post(
+    "/start-without-ref",
+    status_code=status.HTTP_200_OK,
+    response_model=RegAndLoginResponse,
+    description="Telegram auth login."
+)
+async def login(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session):
+    accessToken, refershToken, user = await user_service.login_user(form_data, session)
     referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))

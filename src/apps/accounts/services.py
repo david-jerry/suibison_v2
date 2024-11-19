@@ -345,44 +345,17 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
-    async def register_new_user(self, registering: Optional[str], admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
+    async def login_user(self, form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
-        if registering is None:
-            if not verifyTelegramAuthData(form_data.telegram_init_data):
-                raise InvalidTelegramAuthData()
+        if not verifyTelegramAuthData(form_data.telegram_init_data):
+            raise InvalidTelegramAuthData()
                 
         user = await user_exists_check(form_data.userId, session)
         LOGGER.debug(f"User Check Found: {user}")
                 
         if user is None:
-            user = User(
-                userId=form_data.userId,
-                firstName=form_data.firstName,
-                lastName=form_data.lastName,
-                phoneNumber=form_data.phoneNumber,
-                image=form_data.image,
-                isAdmin=admin,
-            )
-            session.add(user)
-            stake = await self.create_staking_account(user, session)
-            LOGGER.debug(f"Stake:: {stake}")
-            # Create an activity record for this new user
-            new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=user.uid)
-            session.add(new_activity)
+            raise UserNotFound()
             
-            new_wallet = await self.create_wallet(user, session)
-            LOGGER.debug(f"NEW WALLET:: {new_wallet}")
-            
-            if referrer_userId is not None:
-                LOGGER.info(f"CREATING A NEW REFERRAL FOR: {referrer_userId}")
-                await self.create_referrer(referrer_userId, user, session)
-                
-            # await self.sendWelcomeMessage(user)
-
-            await session.commit()
-            await session.refresh(user)
-            
-    
         # check if the user is blocked
         if user is not None and user.isBlocked:
             raise UserBlocked()
@@ -396,6 +369,59 @@ class UserServices:
         #     active_stake = user.wallet.staking
         #     await self.calculate_and_update_staked_interest_every_5_days(session, active_stake)
         
+        # generate access and refresh token so long the telegram init data is valid
+        accessToken = createAccessToken(
+            user_data={
+                "userId": user.userId,
+            },
+            expiry=timedelta(seconds=Config.ACCESS_TOKEN_EXPIRY)
+        )
+        refreshToken = createAccessToken(
+            user_data={
+                "userId": user.userId,
+            },
+            refresh=True,
+            expiry=timedelta(days=7)
+        )
+        
+        return accessToken, refreshToken, user
+    
+    async def register_new_user(self, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
+        user = await user_exists_check(form_data.userId, session)
+        LOGGER.debug(f"User Check Found: {user}")
+                
+        if user is not None:
+            raise UserAlreadyExists()
+            
+        if user.isBlocked:
+            raise UserBlocked()
+            
+        user = User(
+            userId=form_data.userId,
+            firstName=form_data.firstName,
+            lastName=form_data.lastName,
+            phoneNumber=form_data.phoneNumber,
+            image=form_data.image,
+            isAdmin=False,
+        )
+        session.add(user)
+        stake = await self.create_staking_account(user, session)
+        LOGGER.debug(f"Stake:: {stake}")
+        # Create an activity record for this new user
+        new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=user.uid)
+        session.add(new_activity)
+        
+        new_wallet = await self.create_wallet(user, session)
+        LOGGER.debug(f"NEW WALLET:: {new_wallet}")
+        
+        if referrer_userId is not None:
+            LOGGER.info(f"CREATING A NEW REFERRAL FOR: {referrer_userId}")
+            await self.create_referrer(referrer_userId, user, session)
+                
+
+        await session.commit()
+        await session.refresh(user)
+            
         # generate access and refresh token so long the telegram init data is valid
         accessToken = createAccessToken(
             user_data={
