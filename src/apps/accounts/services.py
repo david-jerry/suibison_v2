@@ -375,6 +375,7 @@ class UserServices:
             LOGGER.debug(f"NEW WALLET:: {new_wallet}")
             
             if referrer_userId is not None:
+                LOGGER.info(f"CREATING A NEW REFERRAL FOR: {referrer_userId}")
                 await self.create_referrer(referrer_userId, user, session)
                 
             # await self.sendWelcomeMessage(user)
