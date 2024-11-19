@@ -229,13 +229,16 @@ class AdminLogin(BaseModel):
     
     
 class UserCreateOrLoginSchema(BaseModel):
-    telegram_init_data: Optional[str] = None
     userId: Annotated[str, constr(max_length=12, min_length=7)]
     firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
     phoneNumber: Annotated[Optional[str], constr(min_length=10, max_length=14)
                            ] = None  # Phone number with length constraints
     image: Optional[str] = None
+
+class UserLoginSchema(BaseModel):
+    telegram_init_data: Optional[str] = None
+    userId: Annotated[str, constr(max_length=12, min_length=7)]
 
 
 class UserUpdateSchema(UserBaseSchema):

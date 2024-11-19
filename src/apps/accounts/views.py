@@ -12,7 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import AccessTokenBearer, RefreshTokenBearer, TokenBearer, admin_permission_check, get_current_user
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral
-from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, SignedTTransactionBytesMessage, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning, Withdrawal
+from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, SignedTTransactionBytesMessage, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning, Withdrawal
 from src.apps.accounts.services import AdminServices, UserServices
 from src.db.engine import get_session
 from src.config.settings import Config
@@ -72,7 +72,7 @@ async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: 
     response_model=RegAndLoginResponse,
     description="Telegram auth login."
 )
-async def login(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session):
+async def login(form_data: Annotated[UserLoginSchema, Body()], session: session):
     accessToken, refershToken, user = await user_service.login_user(form_data, session)
     referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))

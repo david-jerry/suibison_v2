@@ -22,17 +22,15 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.apps.accounts.dependencies import user_exists_check
 from src.apps.accounts.enum import ActivityType
 from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
-from src.apps.accounts.schemas import ActivitiesRead, AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserRead, UserUpdateSchema
+from src.apps.accounts.schemas import AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserUpdateSchema
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
 from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, StakingExpired, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
 from src.utils.hashing import createAccessToken, verifyHashKey, verifyTelegramAuthData
 from src.utils.logger import LOGGER
 from src.config.settings import Config
-from src.db.redis import add_level_referral, get_level_referrers, get_sui_usd_price
+from src.db.redis import get_sui_usd_price
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ParseMode
 
 from mnemonic import Mnemonic
 from bip_utils import Bip39EntropyBitLen, Bip39EntropyGenerator, Bip39MnemonicGenerator, Bip39WordsNum, Bip39Languages
@@ -345,7 +343,7 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
-    async def login_user(self, form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
+    async def login_user(self, form_data: UserLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
         if not verifyTelegramAuthData(form_data.telegram_init_data):
             raise InvalidTelegramAuthData()
@@ -391,10 +389,24 @@ class UserServices:
         LOGGER.debug(f"User Check Found: {user}")
                 
         if user is not None:
-            raise UserAlreadyExists()
+            if user.isBlocked:
+                raise UserBlocked()
+            accessToken = createAccessToken(
+                user_data={
+                    "userId": user.userId,
+                },
+                expiry=timedelta(seconds=Config.ACCESS_TOKEN_EXPIRY)
+            )
+            refreshToken = createAccessToken(
+                user_data={
+                    "userId": user.userId,
+                },
+                refresh=True,
+                expiry=timedelta(days=7)
+            )
             
-        if user.isBlocked:
-            raise UserBlocked()
+            return accessToken, refreshToken, user
+            
             
         user = User(
             userId=form_data.userId,
