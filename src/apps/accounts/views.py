@@ -37,7 +37,6 @@ user_service = UserServices()
     description="Initialize a new webapp instance for a user passing a `telegram_init_data` for authorization check and an `*optional* referrerId`(telegram userId) to create the level authorization. Within this endpoint is the function tto auto generate a unique wallet address and an initial activity record for the new user if it is their first time initializing the webapp else it automatically generates an accesstoken and refreshToken when the user is a returning user."
 )
 async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: session, referrer: Optional[str] = None, start: Optional[str] = None):
-    LOGGER.debug(start)
     accessToken, refershToken, user = await user_service.register_new_user(start, False, referrer, form_data, session)
     referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))

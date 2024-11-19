@@ -645,7 +645,7 @@ class UserServices:
         
         expiry_set = expires
         if expires is None:
-            expiry_set = now + timedelta(minutes=0.7)
+            expiry_set = now + timedelta(minutes=5)
 
 
         progress, txBytes, amount_to_show = await asyncio.to_thread(asyncio.run, self.handle_stake_logic(expiry_set, amount, token_meter, user, session))    
