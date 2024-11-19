@@ -214,24 +214,23 @@ class UserServices:
         return None
     
     async def create_referrer(self, referrer_userId: Optional[str], new_user: User, session: AsyncSession):
-        if referrer_userId is not None:                
-            db_result = await session.exec(select(User).where(User.userId == referrer_userId))
-            referring_user = db_result.first()
-            
-            # Save the referral level down to the 5th level in redis for improved performance
-            if referring_user is None:
-                raise ReferrerNotFound()
+        db_result = await session.exec(select(User).where(User.userId == referrer_userId))
+        referring_user = db_result.first()
+        
+        # Save the referral level down to the 5th level in redis for improved performance
+        if referring_user is None:
+            raise ReferrerNotFound()
 
-            fast_boost_time = referring_user.joined + timedelta(hours=24)
-            db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
-            referrals = db_referrals.all()
-            
-            # check for fast boost and credit the users wallet balance accordingly
-            if referring_user.joined < fast_boost_time and len(referrals) >= 2:
-                referring_user.wallet.totalFastBonus += Decimal(3.00)
-                referring_user.wallet.balance += Decimal(3.00)
-                                
-            await self.create_referral_level(new_user, referring_user, 1, session)
+        fast_boost_time = referring_user.joined + timedelta(hours=24)
+        db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
+        referrals = db_referrals.all()
+        
+        # check for fast boost and credit the users wallet balance accordingly
+        if referring_user.joined < fast_boost_time and len(referrals) >= 2:
+            referring_user.wallet.totalFastBonus += Decimal(3.00)
+            referring_user.wallet.balance += Decimal(3.00)
+                            
+        await self.create_referral_level(new_user, referring_user, 1, session)
         return None
                 
     async def add_referrer_earning(self, referralUid: uuid.UUID, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
