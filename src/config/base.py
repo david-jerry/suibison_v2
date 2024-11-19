@@ -7,6 +7,7 @@ BASE_URL = Path(__file__).resolve().parent.parent.parent
 class BaseConfig(BaseSettings):
     ENVIRONMENT: str
     SECRET_KEY: str
+    WEBAPP_URL: str
     ALGORITHM: Optional[str] = "HS256"
     BASE_DIR: Optional[Path] = BASE_URL
     TELEGRAM_TOKEN: str

@@ -31,7 +31,12 @@ from src.utils.logger import LOGGER
 from src.config.settings import Config
 from src.db.redis import add_level_referral, get_level_referrers, get_sui_usd_price
 
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.constants import ParseMode
+
 from mnemonic import Mnemonic
+from bip_utils import Bip39EntropyBitLen, Bip39EntropyGenerator, Bip39MnemonicGenerator, Bip39WordsNum, Bip39Languages
+from cryptography.hazmat.primitives.asymmetric import ed25519
 from sui_python_sdk.wallet import SuiWallet
 
 now = datetime.now()
@@ -259,8 +264,10 @@ class UserServices:
         return None
                 
     async def create_wallet(self, user: User, session: AsyncSession):
-        mnemonic_phrase = Mnemonic("english").generate(strength=128)
+        # mnemonic_phrase = Mnemonic("english").generate(strength=128)
+        mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
         # Generate a new wallet which includes the wallet address and mnemonic phrase
+        # seed = Mnemonic.to_seed(mnemonic_phrase)
         my_wallet = SuiWallet(mnemonic=mnemonic_phrase)
         my_address = my_wallet.get_address()
         my_private_key = my_wallet.private_key.hex()
@@ -338,30 +345,39 @@ class UserServices:
         
         return accessToken, refreshToken, user
 
-    async def sendWelcomeMessage(self, user: User):
-        from telegram import Bot
-        from telegram.constants import ParseMode
+#     async def sendWelcomeMessage(self, user: User):
         
-        bot = Bot(Config.TELEGRAM_TOKEN)
-        message = f"""
-Welcome {user.userId},
+#         bot = Bot(Config.TELEGRAM_TOKEN)
+#         keyboard = [
+#             [
+#                 InlineKeyboardButton(
+#                     text="Launch Mini-App", 
+#                     web_app={"url": Config.WEBAPP_URL}
+#                 )
+#             ]
+#         ]
+#         reply_markup = InlineKeyboardMarkup(keyboard)
+#         message = f"""
+# Welcome {user.userId},
 
-We are excited to have you onboard SUI-Bison, we hope the experience you get from our platform can be shared at no cost to others to help keep the community alive.
+# We are excited to have you onboard SUI-Bison, we hope the experience you get from our platform can be shared at no cost to others to help keep the community alive.
 
-However, Please be aware that there is a minimum deposit amount to initiate a stake.
-<strong>Min Stake: 3.01 SUI</strong>
+# However, Please be aware that there is a minimum deposit amount to initiate a stake.
+# <strong>Min Stake: 3.01 SUI</strong>
 
-Team SUI-Bison
-        """
-        await bot.send_message(chat_id=user.userId, text=message, parse_mode=ParseMode.HTML)
-        return None
+# Team SUI-Bison
+#         """
+#         await bot.send_message(chat_id=user.userId, text=message, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+#         return None
 
-    async def register_new_user(self, admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
+    async def register_new_user(self, registering: Optional[str], admin: bool, referrer_userId: Optional[str], form_data: UserCreateOrLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
-        if not verifyTelegramAuthData(form_data.telegram_init_data):
-            raise InvalidTelegramAuthData()
+        if registering is None:
+            if not verifyTelegramAuthData(form_data.telegram_init_data):
+                raise InvalidTelegramAuthData()
                 
         user = await user_exists_check(form_data.userId, session)
+        LOGGER.debug(f"User Check Found: {user}")
                 
         if user is None:
             user = User(
@@ -384,7 +400,7 @@ Team SUI-Bison
             if referrer_userId is not None:
                 await self.create_referrer(referrer_userId, user, session)
                 
-            await self.sendWelcomeMessage(user)
+            # await self.sendWelcomeMessage(user)
 
             await session.commit()
             await session.refresh(user)

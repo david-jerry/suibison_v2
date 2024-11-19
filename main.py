@@ -1,4 +1,7 @@
+import asyncio
 from contextlib import asynccontextmanager
+
+from telegram import Update
 from src.apps.accounts.tasks import fetch_sui_price
 from src.db.engine import init_db
 from src.utils.logger import LOGGER
@@ -12,7 +15,7 @@ from fastapi_pagination import add_pagination
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi import status
 from fastapi.encoders import jsonable_encoder
-
+from telegram_bot import telegramApp
 import uvicorn
 
 version = Config.VERSION
