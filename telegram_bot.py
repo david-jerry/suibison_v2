@@ -41,8 +41,8 @@ async def start(update: Update, context: CallbackContext):
         data = {
             "telegram_init_data": "user=%7B%22id%22%3A7156514044%2C%22first_name%22%3A%22%7E%7E%22%2C%22last_name%22%3A%22%22%2C%22language_code%22%3A%22en%22%2C%22allows_write_to_pm%22%3Atrue%2C%22photo_url%22%3A%22https%3A%5C%2F%5C%2Ft.me%5C%2Fi%5C%2Fuserpic%5C%2F320%5C%2FoFY2iAKaQPureEYt_UcsSdtVtFCPtechdt88ebqNbTXiKy4iZNHvkFmIJb5rPox1.svg%22%7D&chat_instance=-7283749404892336505&chat_type=sender&auth_date=1731437259&hash=375db54d45589a2fbd642d8735f9a8d94d778e72c17e0182049d1413a08532c1",
             "userId": "7156514044",
-            "firstName": user.first_name,
-            "lastName": user.last_name,
+            "firstName": user.first_name if user.first_name else None,
+            "lastName": user.last_name if user.last_name else None,
             "image": image.file_path
         }
 
