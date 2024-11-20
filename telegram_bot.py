@@ -26,6 +26,7 @@ async def start(update: Update, context: CallbackContext):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     if args is not None:
+        LOGGER.debug(args)
         startapp_param = args[0]
 
         try:
