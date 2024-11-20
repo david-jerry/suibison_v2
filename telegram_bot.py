@@ -25,6 +25,9 @@ async def start(update: Update, context: CallbackContext):
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     if args is not None and len(args) > 0:
         LOGGER.debug(args)
         startapp_param = args[0]
@@ -60,8 +63,10 @@ async def start(update: Update, context: CallbackContext):
 
         # Make the POST request
         response = requests.post(url, headers=headers, json=data)
-        LOGGER.debug(response)
-        await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        LOGGER.debug(response.json())
+        if response.status_code == 201:
+            await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
     else:
         url = f"{Config.DOMAIN}/v2/auth/start"
         LOGGER.debug(f"START URL: {url}")
@@ -85,9 +90,10 @@ async def start(update: Update, context: CallbackContext):
         }
 
         # Make the POST request
-        response = requests.post(url, headers=headers, json=data)
-        LOGGER.debug(response.json())
-        await update.message.reply_text(f"Hello {user.id}, \n<strong>LAUNCH MINIAPP</strong>.", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        response = loop.run_until_complete(requests.post(url, headers=headers, json=data))
+        if response.status_code == 201:
+            await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+        await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
 
 # Register the handler
 telegramApp.add_handler(CommandHandler("start", start))
