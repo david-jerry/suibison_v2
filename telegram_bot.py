@@ -28,8 +28,8 @@ async def start(update: Update, context: CallbackContext):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
+    LOGGER.debug(f"ARGS: {args}")
     if args is not None and len(args) > 0:
-        LOGGER.debug(args)
         startapp_param = args[0]
 
         try:
@@ -55,7 +55,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Define the request body (data)
         data = {
-            "userId": user.id,
+            "userId": str(user.id),
             "firstName": user.first_name if user.first_name else None,
             "lastName": user.last_name if user.last_name else None,
             "image": image.file_path
@@ -83,7 +83,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Define the request body (data)
         data = {
-            "userId": user.id,
+            "userId": str(user.id),
             "firstName": user.first_name if user.first_name else None,
             "lastName": user.last_name if user.last_name else None,
             "image": image.file_path
