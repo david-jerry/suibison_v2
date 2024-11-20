@@ -280,7 +280,7 @@ async def get_a_user(userId: str, session: session):
 async def delete_a_user(userId: str, session: session):
     db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
-    session.delete(user)
+    await session.delete(user)
 
     return {
         "message": "Successfully Deleted",
