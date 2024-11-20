@@ -66,7 +66,8 @@ async def start(update: Update, context: CallbackContext):
         LOGGER.debug(response.json())
         if response.status_code == 201:
             await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-        await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
+        else:
+            await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
     else:
         url = f"{Config.DOMAIN}/v2/auth/start"
         LOGGER.debug(f"START URL: {url}")
@@ -94,7 +95,8 @@ async def start(update: Update, context: CallbackContext):
         LOGGER.debug(response.json())
         if response.status_code == 201:
             await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-        await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
+        else:
+            await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
 
 # Register the handler
 telegramApp.add_handler(CommandHandler("start", start))
