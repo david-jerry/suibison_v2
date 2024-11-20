@@ -15,6 +15,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate
 from apscheduler.schedulers.background import BackgroundScheduler  # runs tasks in the background
 from apscheduler.triggers.cron import CronTrigger  # allows us to specify a recurring time for execution
 
+import requests
 from sqlalchemy import Date, cast
 from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -22,7 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.apps.accounts.dependencies import user_exists_check
 from src.apps.accounts.enum import ActivityType
 from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
-from src.apps.accounts.schemas import AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserUpdateSchema
+from src.apps.accounts.schemas import AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserUpdateSchema, Wallet
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
 from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, StakingExpired, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
@@ -202,6 +203,7 @@ class UserServices:
                 userUid=new_user.uid,
                 userId=referrer.userId,
             )
+            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
             session.add(new_referral)
             session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=referrer.uid))
             # await session.commit()            
@@ -263,13 +265,21 @@ class UserServices:
     async def create_wallet(self, user: User, session: AsyncSession):
         # mnemonic_phrase = Mnemonic("english").generate(strength=128)
         mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
-        LOGGER.debug(f"Phrase: {mnemonic_phrase.ToStr()}")
-        # Generate a new wallet which includes the wallet address and mnemonic phrase
-        # seed = Mnemonic.to_seed(mnemonic_phrase)
-        my_wallet = SuiWallet(mnemonic=mnemonic_phrase.ToStr())
-        my_address = my_wallet.get_address()
-        my_private_key = my_wallet.private_key.hex()
-        signer = my_wallet.full_private_key
+        url = "https://suiwallet.sui-bison.live/wallet/"
+        response = requests.post(url)
+        my_wallet = None
+        if response.status_code == 200:
+            result = response.json()
+            if 'error' in result:
+                raise Exception(f"Error: {result['error']}")
+            res = result
+            LOGGER.debug(res)
+            my_wallet = Wallet(**res)
+        else:
+            response.raise_for_status()
+            
+        my_address = my_wallet.address
+        my_private_key = my_wallet.privateKey
         
         # Save the new wallet in the database
         new_wallet = UserWallet(address=my_address, phrase=mnemonic_phrase.ToStr(), privateKey=my_private_key, userUid=user.uid)
@@ -355,12 +365,11 @@ class UserServices:
             raise UserNotFound()
             
         # check if the user is blocked
-        if user is not None and user.isBlocked:
+        if user.isBlocked:
             raise UserBlocked()
         
         # update the users rank record immediately they open the webapp and the weeks match up
-        if user is not None:
-            await self.calculate_rank_earning(user, session)
+        await self.calculate_rank_earning(user, session)
         
         # # Process active stake balances and earnings
         # if user is not None and user.wallet.staking.endingAt <= datetime.now():
@@ -391,6 +400,7 @@ class UserServices:
         if user is not None:
             if user.isBlocked:
                 raise UserBlocked()
+            
             accessToken = createAccessToken(
                 user_data={
                     "userId": user.userId,
@@ -408,7 +418,7 @@ class UserServices:
             return accessToken, refreshToken, user
             
             
-        user = User(
+        new_user = User(
             userId=form_data.userId,
             firstName=form_data.firstName,
             lastName=form_data.lastName,
@@ -416,23 +426,24 @@ class UserServices:
             image=form_data.image,
             isAdmin=False,
         )
-        session.add(user)
-        stake = await self.create_staking_account(user, session)
+        session.add(new_user)
+        
+        stake = await self.create_staking_account(new_user, session)
         LOGGER.debug(f"Stake:: {stake}")
+        
         # Create an activity record for this new user
-        new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=user.uid)
+        new_activity = Activities(activityType=ActivityType.WELCOME, strDetail="Welcome to SUI-Bison", userUid=new_user.uid)
         session.add(new_activity)
         
-        new_wallet = await self.create_wallet(user, session)
+        new_wallet = await self.create_wallet(new_user, session)
         LOGGER.debug(f"NEW WALLET:: {new_wallet}")
         
         if referrer_userId is not None:
             LOGGER.info(f"CREATING A NEW REFERRAL FOR: {referrer_userId}")
-            await self.create_referrer(referrer_userId, user, session)
+            await self.create_referrer(referrer_userId, new_user, session)
                 
 
         await session.commit()
-        await session.refresh(user)
             
         # generate access and refresh token so long the telegram init data is valid
         accessToken = createAccessToken(

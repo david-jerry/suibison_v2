@@ -25,7 +25,7 @@ async def start(update: Update, context: CallbackContext):
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    if args:
+    if args is not None:
         startapp_param = args[0]
 
         try:
@@ -51,7 +51,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Define the request body (data)
         data = {
-            "userId": "7156514044",
+            "userId": user.id,
             "firstName": user.first_name if user.first_name else None,
             "lastName": user.last_name if user.last_name else None,
             "image": image.file_path
@@ -77,7 +77,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Define the request body (data)
         data = {
-            "userId": "7156514044",
+            "userId": user.id,
             "firstName": user.first_name if user.first_name else None,
             "lastName": user.last_name if user.last_name else None,
             "image": image.file_path

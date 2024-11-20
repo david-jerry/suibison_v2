@@ -21,6 +21,12 @@ class Message(BaseModel):
 class Withdrawal(BaseModel):
     wallet: str
     
+
+class Wallet(BaseModel):
+    address: str
+    privateKey: str
+    
+    
     
 class DeleteMessage(BaseModel):
     message: str

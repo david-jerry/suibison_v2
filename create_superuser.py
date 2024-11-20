@@ -8,6 +8,7 @@ from src.apps.accounts.enum import ActivityType
 from src.apps.accounts.models import Activities, User
 from src.apps.accounts.services import UserServices
 from src.db.engine import get_session
+from src.errors import ReferrerNotFound
 from src.utils.hashing import createAccessToken
 from src.utils.logger import LOGGER
 
@@ -63,9 +64,11 @@ async def create_superuser():
         new_wallet = await user_services.create_wallet(superuser, session)
         LOGGER.debug(f"NEW WALLET:: {new_wallet}")
         
-        await user_services.create_referrer("6773082668", superuser, session)
-        LOGGER.debug("Created Referral")
-
+        try:
+            await user_services.create_referrer("6773082668", superuser, session)
+            LOGGER.debug("Created Referral")
+        except ReferrerNotFound:
+            pass
         # generate access and refresh token so long the telegram init data is valid
         await session.commit()
         await session.refresh(superuser)
