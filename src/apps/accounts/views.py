@@ -247,7 +247,7 @@ async def update_token_meter(form_data: Annotated[TokenMeterUpdate, Body()], ses
     description="Returns a specific user to an admin"
 )
 async def get_a_user(userId: str, session: session):
-    db_user = session.exec(select(User).where(User.userId == userId))
+    db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
     referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
@@ -277,8 +277,8 @@ async def get_a_user(userId: str, session: session):
     dependencies=[Depends(admin_permission_check)],
     description="Returns a specific user to an admin"
 )
-async def get_a_user(userId: str, session: session):
-    db_user = session.exec(select(User).where(User.userId == userId))
+async def delete_a_user(userId: str, session: session):
+    db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
     session.delete(user)
 
