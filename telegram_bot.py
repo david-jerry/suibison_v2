@@ -90,7 +90,7 @@ async def start(update: Update, context: CallbackContext):
         }
 
         # Make the POST request
-        response = loop.run_until_complete(requests.post(url, headers=headers, json=data))
+        response = requests.post(url, headers=headers, json=data)
         if response.status_code == 201:
             await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
         await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
