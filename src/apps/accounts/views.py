@@ -352,8 +352,13 @@ async def me(user: Annotated[User, Depends(get_current_user)], session: session)
     description="Initiates a stake and staarts the countdown to a 100days"
 )
 async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):    
-    txBytes = await user_service.stake_sui(user, session)
-    return txBytes
+    staked = await user_service.stake_sui(user, session)
+    message = "Initialized/Toppped a Stake"
+    if not staked:
+        message = "Timed out. Please go about your activity and whenever the stake has reflected in your wallet balance we shall reflect it."
+    return {
+        "message": message
+    }
 
 @user_router.post(
     "/me/withdraw",

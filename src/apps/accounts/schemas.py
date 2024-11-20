@@ -27,13 +27,12 @@ class Wallet(BaseModel):
     privateKey: str
     
     
-    
 class DeleteMessage(BaseModel):
     message: str
     
     
 class SignedTTransactionBytesMessage(BaseModel):
-    txBytes: Optional[str] = None
+    message: str = None
 
 
 class AccessToken(BaseModel):

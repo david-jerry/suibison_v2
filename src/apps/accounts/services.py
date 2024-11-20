@@ -188,6 +188,20 @@ class AdminServices:
     
     
 class UserServices:
+    async def sui_wallet_endpoint(self, url: str, body: Optional[dict]):
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(url, headers=headers, json=body)
+        LOGGER.debug(response.json())
+        result = response.json()
+        if 'error' in result:
+            raise Exception(f"Error: {result['error']}")
+        res = result
+        LOGGER.debug(res)
+        return res
+
     async def create_referral_level(self, new_user: User, referring_user: User, level: int, session: AsyncSession):
         referrer = referring_user
         
@@ -266,20 +280,11 @@ class UserServices:
         # mnemonic_phrase = Mnemonic("english").generate(strength=128)
         mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
         url = "https://suiwallet.sui-bison.live/wallet"
-        headers = {
-            "accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        response = requests.post(url, headers=headers)
-        LOGGER.debug(response.json())
-        my_wallet = None
-        result = response.json()
-        if 'error' in result:
-            raise Exception(f"Error: {result['error']}")
-        res = result
+        
+        res = await self.sui_wallet_endpoint(url, None)
         LOGGER.debug(res)
-        my_wallet = Wallet(**res)
-            
+        
+        my_wallet = Wallet(**res)    
         my_address = my_wallet.address
         my_private_key = my_wallet.privateKey
         
@@ -495,7 +500,7 @@ class UserServices:
         allActivities = db.all()
         return allActivities
     
-    async def transferToAdminWallet(self, user: User, session: AsyncSession):
+    async def transferToAdminWallet(self, user: User, amount: Decimal, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
@@ -503,14 +508,23 @@ class UserServices:
         if token_meter is None:
             raise TokenMeterDoesNotExists()
         
-        coinDetail = await SUI.getCoins(user.wallet.address)
-        coins = []
-        for coin in coinDetail:
-            if coin.coinType == "0x2::sui::SUI":
-                coins.append(coin.coinObjectId)
+        # coinDetail = await SUI.getCoins(user.wallet.address)
+        # coins = []
+        # for coin in coinDetail:
+        #     if coin.coinType == "0x2::sui::SUI":
+        #         coins.append(coin.coinObjectId)
+        # try:
+        #     transResponse = await SUI.payAllSui(user.wallet.address, token_meter.tokenAddress, 10000, coins)
+        #     return transResponse.txBytes
         try:
-            transResponse = await SUI.payAllSui(user.wallet.address, token_meter.tokenAddress, 10000, coins)
-            return transResponse.txBytes
+            url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
+            body = {
+                "secret": user.wallet.privateKey,
+                "amount": int(amount),
+                "recipient": token_meter.tokenAddress
+            }
+            res = await self.sui_wallet_endpoint(url, body)
+            return res["transaction"]["result"]["digest"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -522,14 +536,15 @@ class UserServices:
         if token_meter is None:
             raise TokenMeterDoesNotExists()
         
-        coinDetail = await SUI.getCoins(user.wallet.address)
-        coins = []
-        for coin in coinDetail:
-            if coin.coinType == "0x2::sui::SUI":
-                coins.append(coin.coinObjectId)
         try:
-            transResponse = await SUI.paySui(token_meter.tokenAddress, wallet, amount, 10000, coins)
-            return transResponse.txBytes
+            url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
+            body = {
+                "secret": token_meter.tokenPrivateKey,
+                "amount": int(amount),
+                "recipient": wallet
+            }
+            res = await self.sui_wallet_endpoint(url, body)
+            return res["transaction"]["result"]["digest"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -540,21 +555,20 @@ class UserServices:
         
         if token_meter is None:
             raise TokenMeterDoesNotExists()
-        
-        
-        # determine that the company's wallet address has sui tokens to transfer to withdrawing user
-        coinDetail = await SUI.getCoins(token_meter.tokenAddress)
-        coins = []
-        balances = []
-        if len(coinDetail) < 1:
-            raise InsufficientBalance()
-        
-        for coin in coinDetail:
-            if coin.coinType == "0x2::sui::SUI":
-                coins.append(coin.coinObjectId)
-                balances.append(Decimal(coin.balance) / 10**9)
-                
-        if user.wallet.earnings > sum(balances):
+
+        # check balance
+        try:
+            url = "https://suiwallet.sui-bison.live/wallet/balance"
+            body = {
+                "address": token_meter.tokenAddress
+            }
+            res = await self.sui_wallet_endpoint(url, body)
+            LOGGER.debug(f"Admin Balance Check: {pprint.pprint(res)}")
+            amount = Decimal(int(res["balance"]) / 10**9)
+        except Exception:
+            amount = Decimal(0.000000000)
+
+        if amount < user.wallet.earning:
             raise InsufficientBalance()
                 
         sevenDaysLater = now + timedelta(days=7)
@@ -573,6 +587,8 @@ class UserServices:
         
         # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.staking.deposit += redepositable_amount
+        
+        txDigest = await self.transferFromAdminWallet(withdrawal_wallet, (withdawable_amount * 10**9), user, session)
 
         new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userId=user.userId)
         session.add(new_activity)
@@ -616,7 +632,6 @@ class UserServices:
 
     async def handle_stake_logic(self, expiry_set: datetime, amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
         """Core logic for handling the staking process."""
-        txBytes = None
         try:
             if Decimal(0.001) < amount < Decimal(1):
                 amount_to_show = amount - (amount * Decimal(0.1))
@@ -633,8 +648,8 @@ class UserServices:
                     await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
 
                 # Transfer to admin wallet
-                txBytes = await self.transferToAdminWallet(user, session)
-                return False, txBytes, amount_to_show
+                await self.transferToAdminWallet(user, session)
+                return False, amount_to_show
             elif amount >= Decimal(1):
                 amount_to_show = amount - (amount * Decimal(0.1))
                 sbt_amount = amount * Decimal(0.1)
@@ -650,9 +665,9 @@ class UserServices:
                     await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
 
                 # Transfer to admin wallet
-                txBytes = await self.transferToAdminWallet(user, session)
-                return True, txBytes, amount_to_show
-            elif amount < Decimal(0.0001):
+                txDigest = await self.transferToAdminWallet(user, session)
+                return True, amount_to_show
+            elif amount < Decimal(0.001):
                 raise InsufficientBalance()
         except InsufficientBalance:
             if expiry_set < datetime.now():
@@ -660,25 +675,45 @@ class UserServices:
             
             # Retry after waiting for 30 seconds
             await asyncio.sleep(30)
-            coin_balance = await SUI.getBalance(user.wallet.address)
-            amount = Decimal(coin_balance.coinObjectCount / 10**9)
+            try:
+                url = "https://suiwallet.sui-bison.live/wallet/balance"
+                body = {
+                    "address": user.wallet.address
+                }
+                res = await self.sui_wallet_endpoint(url, body)
+                LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
+                amount = Decimal(int(res["balance"]) / 10**9)
+            except Exception:
+                amount = Decimal(0.000000000)
             await self.handle_stake_logic(expiry_set, amount, token_meter, user, session)
 
     async def stake_sui(self, user: User, session: AsyncSession, expires: Optional[datetime] = None):
         # user has to successfuly transfer into this wallet account then we 
         # first check for them to confirm the transfer is successful
         # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
-        coin_balance = await SUI.getBalance(user.wallet.address)
-        amount: Decimal = Decimal(coin_balance.coinObjectCount / 10**9)
+        try:
+            url = "https://suiwallet.sui-bison.live/wallet/balance"
+            body = {
+                "address": user.wallet.address
+            }
+            res = await self.sui_wallet_endpoint(url, body)
+            LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
+            amount = Decimal(int(res["balance"]) / 10**9)
+        except Exception:
+            amount = Decimal(0.000000000)
+            
         db_token_meter = await session.exec(select(TokenMeter))
         token_meter = db_token_meter.first()
         
+        if token_meter is None:
+            raise TokenMeterDoesNotExists()
+        
         expiry_set = expires
         if expires is None:
-            expiry_set = now + timedelta(minutes=5)
+            expiry_set = now + timedelta(minutes=3)
 
 
-        progress, txBytes, amount_to_show = await asyncio.to_thread(asyncio.run, self.handle_stake_logic(expiry_set, amount, token_meter, user, session))    
+        progress, amount_to_show = await asyncio.to_thread(asyncio.run, self.handle_stake_logic(expiry_set, amount, token_meter, user, session))    
         
         enddate = now + timedelta(days=100)
         stake = user.staking           
@@ -708,7 +743,7 @@ class UserServices:
 
         await session.commit()
         await session.refresh(user)
-        return txBytes
+        return progress
     
     async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
         """
@@ -724,19 +759,16 @@ class UserServices:
         # loop this task until staking expiry date has reached then stop it
         if remaining_days > 0:
             # calculate interest based on remaining days and ensure the roi is less than 4%
-            if stake.roi < Decimal(0.04):
-                if stake.nextRoiIncrease == now:
-                    new_roi = stake.roi + Decimal(0.005)        
-                    stake.roi = new_roi        
-                    interest_earned = stake.deposit * new_roi
-                    user.wallet.earnings += interest_earned                    
-                    stake.nextRoiIncrease = now + timedelta(days=5)
-                user.wallet.earnings += (stake.deposit * stake.roi)
+            if (stake.roi < Decimal(0.04)) and (stake.nextRoiIncrease == now):
+                new_roi = stake.roi + Decimal(0.005)        
+                stake.roi = new_roi        
+            interest_earned = stake.deposit * new_roi
+            user.wallet.earnings += interest_earned                    
+            stake.nextRoiIncrease = now + timedelta(days=5)
+            user.wallet.earnings += (stake.deposit * stake.roi)
                 
         if remaining_days == 0 or stake.end <= now:
             stake.roi = 0.01
-            stake.end = None
-            stake.start = None
             stake.nextRoiIncrease = None
             
         await session.commit()
