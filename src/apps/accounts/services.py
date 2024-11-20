@@ -266,7 +266,11 @@ class UserServices:
         # mnemonic_phrase = Mnemonic("english").generate(strength=128)
         mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
         url = "https://suiwallet.sui-bison.live/wallet/"
-        response = requests.post(url)
+        headers = {
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(url, headers=headers)
         my_wallet = None
         if response.status_code == 200:
             result = response.json()
