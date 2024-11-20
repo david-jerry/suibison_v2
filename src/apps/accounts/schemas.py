@@ -311,14 +311,14 @@ class StakingRead(StakingBaseSchema):
 class TokenMeterCreate(BaseModel):
     tokenAddress: str
     tokenPrivateKey: Optional[str] = None
-    tokenPhrasee: Optional[str] = None
+    tokenPhrase: Optional[str] = None
     totalCap: Decimal = Decimal(0)
 
 
 class TokenMeterUpdate(BaseModel):
     tokenAddress: Optional[str] = None
     tokenPrivateKey: Optional[str] = None
-    tokenPhrasee: Optional[str] = None
+    tokenPhrase: Optional[str] = None
     totalCap: Optional[Decimal] = None
 
 

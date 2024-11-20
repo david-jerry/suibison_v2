@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import pprint
 
 from telegram import Update
-from src.apps.accounts.tasks import fetch_sui_price
+from src.apps.accounts.tasks import fetch_all_balances_and_submit_to_admin, fetch_sui_price, update_user_balances
 from src.db.engine import init_db
 from src.utils.logger import LOGGER
 from src.middleware import register_middleware
@@ -58,6 +58,9 @@ The API may have rate limits to prevent abuse. Please refer to the official Next
 @asynccontextmanager
 async def life_span(app: FastAPI):
     LOGGER.info("Server is running")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     await init_db()
     try:
         await fetch_sui_price()

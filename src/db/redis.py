@@ -3,6 +3,7 @@ import json
 from typing import Optional
 import uuid
 import redis.asyncio as aioredis
+from src.apps.accounts.models import User
 from src.config.settings import (
     broker_url,
 )
@@ -59,6 +60,7 @@ async def add_level_referral(userId: str, level: int, referralId: str, balance: 
         })
         
     await redis_client.set(key, json.dumps(referrers))
+    return None
         
 async def get_level_referrers(userId: str, level: int):
     key = f"user:{userId}:level:{level}"
@@ -74,3 +76,29 @@ async def get_level_referrers(userId: str, level: int):
 async def get_sui_usd_price():
     price = await redis_client.get("sui_price")
     return Decimal(json.loads(price.decode("utf-8")))
+
+# async def save_addresses(user: User):
+#     key = f"wallet"
+#     data = {
+#         "userId": user.userId,
+#         "address": user.wallet.address
+#     }
+#     old_datas = await redis_client.get("wallet")
+    
+#     await redis_client.set(key, json.dumps(data))
+#     return None
+
+# async def get_address(user: User):
+#     key = f"wallet"
+#     address = await redis_client.get(key)
+#     return json.loads(address.decode("utf-8"))
+
+# async def get_all_addresses():
+#     addresses = []
+#     match = "wallets"
+#     # res = redis_client.scan_iter(match)
+#     redis_client.get(match):
+#         value = await redis_client.get(key)
+#         addresses.append(json.loads(value.decode("utf=8")))
+#     return addresses
+    

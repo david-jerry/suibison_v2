@@ -630,95 +630,28 @@ class UserServices:
         user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
         return None
 
-    async def handle_stake_logic(self, expiry_set: datetime, amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
+    async def handle_stake_logic(self,amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
         """Core logic for handling the staking process."""
-        try:
-            if Decimal(0.001) < amount < Decimal(1):
-                amount_to_show = amount - (amount * Decimal(0.1))
-                sbt_amount = amount * Decimal(0.1)
+        if Decimal(0.000000000) < amount >= Decimal(1.000000000) :
+            amount_to_show = amount - (amount * Decimal(0.1))
+            sbt_amount = amount * Decimal(0.1)
 
-                # Update SBT records
-                token_meter.totalAmountCollected += sbt_amount
-                token_meter.totalDeposited += amount
-                user.staking.deposit += amount_to_show
-                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+            # Update SBT records
+            token_meter.totalAmountCollected += sbt_amount
+            token_meter.totalDeposited += amount
+            user.staking.deposit += amount_to_show
+            await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-                # Handle first-time staking
-                if not user.hasMadeFirstDeposit:
-                    await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
+            # Handle first-time staking
+            if not user.hasMadeFirstDeposit:
+                await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
 
-                # Transfer to admin wallet
-                await self.transferToAdminWallet(user, session)
-                return False, amount_to_show
-            elif amount >= Decimal(1):
-                amount_to_show = amount - (amount * Decimal(0.1))
-                sbt_amount = amount * Decimal(0.1)
-
-                # Update SBT records
-                token_meter.totalAmountCollected += sbt_amount
-                token_meter.totalDeposited += amount
-                user.staking.deposit += amount_to_show
-                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
-
-                # Handle first-time staking
-                if not user.hasMadeFirstDeposit:
-                    await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
-
-                # Transfer to admin wallet
-                txDigest = await self.transferToAdminWallet(user, session)
-                return True, amount_to_show
-            elif amount < Decimal(0.001):
-                raise InsufficientBalance()
-        except InsufficientBalance:
-            if expiry_set < datetime.now():
-                raise StakingExpired()
+            # Transfer to admin wallet
+            await self.transferToAdminWallet(user, session)
+            enddate = now + timedelta(days=100)
+            stake = user.staking           
             
-            # Retry after waiting for 30 seconds
-            await asyncio.sleep(30)
-            try:
-                url = "https://suiwallet.sui-bison.live/wallet/balance"
-                body = {
-                    "address": user.wallet.address
-                }
-                res = await self.sui_wallet_endpoint(url, body)
-                LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
-                amount = Decimal(int(res["balance"]) / 10**9)
-            except Exception:
-                amount = Decimal(0.000000000)
-            await self.handle_stake_logic(expiry_set, amount, token_meter, user, session)
-
-    async def stake_sui(self, user: User, session: AsyncSession, expires: Optional[datetime] = None):
-        # user has to successfuly transfer into this wallet account then we 
-        # first check for them to confirm the transfer is successful
-        # NOTE: should be improved with a function that checks repeatedly for transfer success and can come from the frontend to initiate a stake if there is a confirmed sui balance
-        try:
-            url = "https://suiwallet.sui-bison.live/wallet/balance"
-            body = {
-                "address": user.wallet.address
-            }
-            res = await self.sui_wallet_endpoint(url, body)
-            LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
-            amount = Decimal(int(res["balance"]) / 10**9)
-        except Exception:
-            amount = Decimal(0.000000000)
-            
-        db_token_meter = await session.exec(select(TokenMeter))
-        token_meter = db_token_meter.first()
-        
-        if token_meter is None:
-            raise TokenMeterDoesNotExists()
-        
-        expiry_set = expires
-        if expires is None:
-            expiry_set = now + timedelta(minutes=3)
-
-
-        progress, amount_to_show = await asyncio.to_thread(asyncio.run, self.handle_stake_logic(expiry_set, amount, token_meter, user, session))    
-        
-        enddate = now + timedelta(days=100)
-        stake = user.staking           
-        
-        if progress:
+            # if there is a top up or new stake balance then run else just skip
             if stake.end < now:
                 stake.start = now
                 stake.end = enddate
@@ -740,10 +673,52 @@ class UserServices:
 
                 await session.commit()
                 await session.refresh(stake)
+        elif Decimal(0.000000000) < amount < Decimal(0.9):
+            amount_to_show = amount - (amount * Decimal(0.1))
+            sbt_amount = amount * Decimal(0.1)
 
+            # Update SBT records
+            token_meter.totalAmountCollected += sbt_amount
+            token_meter.totalDeposited += amount
+            user.staking.deposit += amount_to_show
+            await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+
+            # Handle first-time staking
+            if not user.hasMadeFirstDeposit:
+                await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
+
+            # Transfer to admin wallet
+            await self.transferToAdminWallet(user, session)
+            return False, amount_to_show
+        
+
+    async def stake_sui(self, user: User, session: AsyncSession):
+        # checks the user balance
+        try:
+            url = "https://suiwallet.sui-bison.live/wallet/balance"
+            body = {
+                "address": user.wallet.address
+            }
+            res = await self.sui_wallet_endpoint(url, body)
+            LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
+            amount = Decimal(int(res["balance"]) / 10**9)
+        except Exception:
+            amount = Decimal(0.000000000)
+            
+        # get ttoken meter details
+        db_token_meter = await session.exec(select(TokenMeter))
+        token_meter = db_token_meter.first()
+        
+        if token_meter is None:
+            raise TokenMeterDoesNotExists()
+
+        # perform stake calculations
+        await self.handle_stake_logic(amount, token_meter, user, session)    
+        
         await session.commit()
         await session.refresh(user)
-        return progress
+
+
     
     async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
         """

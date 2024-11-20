@@ -33,16 +33,25 @@ celery_app.autodiscover_tasks(packages=['src.apps.accounts'], related_name='task
 
 # run the task to fetch sui price every hour(3600 seconds) and store in the redis database
 celery_app.conf.beat_schedule = {
-    "fetch_sui_price": {
-        "task": "fetch_dollar_price",
+    "fetch_sui_usd_price_hourly": {
+        "task": "fetch_sui_usd_price_hourly",
         "schedule": 3660,
-    }
+    },
+    # 'update_user_balances_every_hour': {
+    #     'task': 'update_user_balances',
+    #     'schedule': crontab(minute='0', hour='*'),
+    # },
 }
 
+
+
 @celery_app.on_after_configure.connect
-async def setup_periodic_tasks(sender, session: db_dependency, **kwargs):
+def setup_periodic_tasks(sender, session: db_dependency, **kwargs):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     try:
-        await_tasks = await celery_beat.get_periodic_taskks(session)
+        await_tasks = loop.run_forever(celery_beat.get_periodic_taskks(session))
         tasks = await_tasks
         
         for task in tasks:

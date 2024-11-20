@@ -2,31 +2,51 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
+import pprint
 from typing import Annotated
 from celery import shared_task
 from fastapi import Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 import ast
-from telegram import User
+from src.apps.accounts.models import User, UserWallet
 import yfinance as yf
 
-from src.apps.accounts.models import TokenMeter
+from src.apps.accounts.services import UserServices
 from src.celery_tasks import celery_app
 from src.db.engine import get_session
 from src.db.redis import redis_client
 from src.utils.logger import LOGGER
 from sqlmodel import select
 
-@celery_app.task(name="fetch_dollar_price")
+user_services = UserServices()
+session = Annotated[AsyncSession, Depends(get_session)]
+
+@celery_app.task(name="fetch_sui_usd_price_hourly")
 def fetch_sui_usd_price_hourly():
     # fetch dollar rate from oe sui to check agaist the entire website
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    future = loop.run_until_complete(fetch_sui_price())
+    loop.run_until_complete(fetch_sui_price())
     loop.close()
-    # asyncio.run(fetch_sui_price())
+    
+# @celery_app.task(name="update_user_balances")
+# def update_user_balances():
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     loop.run_until_complete(fetch_all_balances_and_submit_to_admin())
+#     loop.close()
 
 
+
+# async def fetch_all_balances_and_submit_to_admin():
+#     with get_session() as session:
+#         result = await session.exec(select(UserWallet))
+#         future = result.all()
+#         while True:
+#             for wallet in future:
+#                 await user_services.stake_sui(wallet.user, session)
+#             return True
+            
 async def fetch_sui_price():
     sui = yf.Ticker("SUI20947-USD")
     rate = sui.fast_info.last_price

@@ -3,6 +3,9 @@ from decimal import Decimal
 from typing import Annotated, List, Optional
 import uuid
 
+from apscheduler.schedulers.background import BackgroundScheduler  # runs tasks in the background
+from apscheduler.triggers.cron import CronTrigger  # allows us to specify a recurring time for execution
+
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, File, Path, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 from fastapi_pagination import Page, paginate
@@ -11,7 +14,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import AccessTokenBearer, RefreshTokenBearer, TokenBearer, admin_permission_check, get_current_user
-from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral
+from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserWallet
 from src.apps.accounts.schemas import AccessToken, ActivitiesRead, AdminLogin, AllStatisticsRead, DeleteMessage, Message, MatrixPoolRead, MatrixUserCreateUpdate, RegAndLoginResponse, SignedTTransactionBytesMessage, StakingCreate, SuiDollarRate, TokenMeterCreate, TokenMeterRead, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserRead, UserUpdateSchema, UserWithReferralsRead, WithdrawEarning, Withdrawal
 from src.apps.accounts.services import AdminServices, UserServices
 from src.db.engine import get_session
@@ -29,6 +32,24 @@ matrix_router = APIRouter()
 
 admin_service = AdminServices()
 user_service = UserServices()
+
+scheduler = BackgroundScheduler({
+    "apscheduler.jobstores.default": {
+        "type": "sqlalchemy",
+        "url": Config.DATABASE_URL
+    },
+    'apscheduler.executors.default': {
+        'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
+        'max_workers': '50'
+    },
+    'apscheduler.executors.processpool': {
+        'type': 'processpool',
+        'max_workers': '20'
+    },
+    'apscheduler.job_defaults.coalesce': 'false',
+    'apscheduler.job_defaults.max_instances': '12',
+    'apscheduler.timezone': 'UTC',
+})
 
 @auth_router.post(
     "/start",
@@ -280,6 +301,16 @@ async def get_a_user(userId: str, session: session):
 async def delete_a_user(userId: str, session: session):
     db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
+    db_pool_users = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.userId == user.uid))
+    all_pool = db_pool_users.all()
+    await session.delete(user.wallet)
+    await session.delete(user.staking)
+    await session.delete(user.referrer)
+    for ctivity in user.activities:
+        await session.delete(ctivity)
+    for pu in all_pool:
+        await session.delete(pu)
+    
     await session.delete(user)
     await session.commit()
 
@@ -352,10 +383,14 @@ async def me(user: Annotated[User, Depends(get_current_user)], session: session)
     description="Initiates a stake and staarts the countdown to a 100days"
 )
 async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):    
-    staked = await user_service.stake_sui(user, session)
-    message = "Initialized/Toppped a Stake"
-    if not staked:
-        message = "Timed out. Please go about your activity and whenever the stake has reflected in your wallet balance we shall reflect it."
+    now = datetime.now()
+    trigger = CronTrigger(minute=now.minute, second=now.second, end_date=now + timedelta(minutes=5))
+    scheduler.add_job(user_service.stake_sui, trigger, args=[user, session])
+    scheduler.start()
+    # staked = await user_service.stake_sui(user, session)
+    # message = "Initialized/Toppped a Stake"
+    message = "Please go about your activity and whenever the stake has reflected in your wallet balance we shall reflect it."
+    # if not staked:
     return {
         "message": message
     }
