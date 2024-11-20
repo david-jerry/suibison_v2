@@ -187,27 +187,12 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def executeTransaction(self, bcsTxBytes: str, phrase: str):
-        # NOTE WORK ON THIS TO DETERMINE THE SIGNER
-        my_wallet = SuiWallet(mnemonic=phrase)
-        txBytes = base64.b64decode(bcsTxBytes)
-        signatuure = await self.sign_transaction(txBytes, my_wallet.private_key, my_wallet.public_key)
-        pub_key = base64.b64encode(my_wallet.public_key).decode()
-        priv_key = base64.b64encode(my_wallet.private_key).decode()
-        signature = base64.b64encode(signatuure).decode()
-        LOGGER.debug(f"signatuure: {base64.b64encode(signatuure).decode()}")
-        LOGGER.debug(f"pub_key: {my_wallet.public_key}")
-        LOGGER.debug(f"peiv_key: {priv_key}")
+    async def executeTransaction(self, bcsTxBytes: str, privateKey: str):
         payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "sui_executeTransactionBlock",
-            "params": [
-                bcsTxBytes,
-                [signature]
-            ]
+            "secret": privateKey,
+            "txBytes": bcsTxBytes,
         }
-        response = await asyncio.to_thread(requests.post, self.url, json=payload)
+        response = await asyncio.to_thread(requests.post, "https://ts.sui-bison.live/execute-transaction", json=payload)
         LOGGER.debug(response)
         
         if response.status_code == 200:

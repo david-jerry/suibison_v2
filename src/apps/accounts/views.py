@@ -270,6 +270,21 @@ async def get_a_user(userId: str, session: session):
         "referralsLv5": referralsLv5,
     }
 
+@auth_router.delete(
+    "/{userId}",
+    status_code=status.HTTP_200_OK,
+    response_model=DeleteMessage,
+    dependencies=[Depends(admin_permission_check)],
+    description="Returns a specific user to an admin"
+)
+async def get_a_user(userId: str, session: session):
+    db_user = session.exec(select(User).where(User.userId == userId))
+    user = db_user.first()
+    session.delete(user)
+
+    return {
+        "message": "Successfully Deleted",
+    }
 
 
 

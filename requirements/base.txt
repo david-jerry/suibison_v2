@@ -10,6 +10,7 @@ asgiref
 asyncpg
 babel==2.16.0
 bcrypt==4.0.1
+bech32==1.2.0
 bip-utils==2.9.3
 ccxt==4.4.23
 celery
