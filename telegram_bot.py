@@ -86,7 +86,7 @@ async def start(update: Update, context: CallbackContext):
 
         # Make the POST request
         response = requests.post(url, headers=headers, json=data)
-        LOGGER.debug(response)
+        LOGGER.debug(response.json())
         await update.message.reply_text(f"Hello {user.id}, \n<strong>LAUNCH MINIAPP</strong>.", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
 
 # Register the handler
