@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+import pprint
 
 from telegram import Update
 from src.apps.accounts.tasks import fetch_sui_price
@@ -58,7 +59,10 @@ The API may have rate limits to prevent abuse. Please refer to the official Next
 async def life_span(app: FastAPI):
     LOGGER.info("Server is running")
     await init_db()
-    await fetch_sui_price()
+    try:
+        await fetch_sui_price()
+    except Exception as e:
+        LOGGER.debug(f"SUI Balance Error: {pprint.pprint(e, indent=4, depth=4)}")
     yield
     LOGGER.info("Server has stopped")
 

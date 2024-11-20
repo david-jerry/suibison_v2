@@ -265,22 +265,20 @@ class UserServices:
     async def create_wallet(self, user: User, session: AsyncSession):
         # mnemonic_phrase = Mnemonic("english").generate(strength=128)
         mnemonic_phrase = Bip39MnemonicGenerator().FromWordsNumber(Bip39WordsNum.WORDS_NUM_12)
-        url = "https://suiwallet.sui-bison.live/wallet/"
+        url = "https://suiwallet.sui-bison.live/wallet"
         headers = {
             "accept": "application/json",
             "Content-Type": "application/json"
         }
         response = requests.post(url, headers=headers)
+        LOGGER.debug(response.json())
         my_wallet = None
-        if response.status_code == 200:
-            result = response.json()
-            if 'error' in result:
-                raise Exception(f"Error: {result['error']}")
-            res = result
-            LOGGER.debug(res)
-            my_wallet = Wallet(**res)
-        else:
-            response.raise_for_status()
+        result = response.json()
+        if 'error' in result:
+            raise Exception(f"Error: {result['error']}")
+        res = result
+        LOGGER.debug(res)
+        my_wallet = Wallet(**res)
             
         my_address = my_wallet.address
         my_private_key = my_wallet.privateKey
@@ -431,6 +429,7 @@ class UserServices:
             isAdmin=False,
         )
         session.add(new_user)
+        await session.commit()
         
         stake = await self.create_staking_account(new_user, session)
         LOGGER.debug(f"Stake:: {stake}")
@@ -448,23 +447,24 @@ class UserServices:
                 
 
         await session.commit()
+        await session.refresh(new_user)
             
         # generate access and refresh token so long the telegram init data is valid
         accessToken = createAccessToken(
             user_data={
-                "userId": user.userId,
+                "userId": new_user.userId,
             },
             expiry=timedelta(seconds=Config.ACCESS_TOKEN_EXPIRY)
         )
         refreshToken = createAccessToken(
             user_data={
-                "userId": user.userId,
+                "userId": new_user.userId,
             },
             refresh=True,
             expiry=timedelta(days=7)
         )
         
-        return accessToken, refreshToken, user
+        return accessToken, refreshToken, new_user
     
     async def return_user_by_userId(self, userId: int, session: AsyncSession):
         db_result = await session.exec(select(User).where(User.userId == userId))
