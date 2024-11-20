@@ -281,6 +281,7 @@ async def delete_a_user(userId: str, session: session):
     db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
     await session.delete(user)
+    await session.commit()
 
     return {
         "message": "Successfully Deleted",
