@@ -456,7 +456,7 @@ class UserServices:
         LOGGER.debug(f"SECOND CHECK PASS? : {Decimal(0.000000000) < amount < Decimal(0.9)}")
         LOGGER.debug(f"THIRD CHECK PASS? : {False}")
         
-        pt_res = await session.exec(select(PendingTransactions).where(PendingTransactions.amount == amount).where(PendingTransactions.userUid == user.uid).where(PendingTransactions.status == False))
+        pt_res = await session.exec(select(PendingTransactions).where(PendingTransactions.amount == amount).where(PendingTransactions.userUid == user.uid).where(PendingTransactions.commpleted == False))
         pendingTransaction = pt_res.first()
         
         
