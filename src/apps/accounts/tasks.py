@@ -76,9 +76,10 @@ async def calculate_and_update_staked_interest_every_5_days(self, user: User, st
             if (stake.roi < Decimal(0.04)) and (stake.nextRoiIncrease == now):
                 new_roi = stake.roi + Decimal(0.005)        
                 stake.roi = new_roi        
+                stake.nextRoiIncrease = now + timedelta(days=5)
+                
             interest_earned = stake.deposit * new_roi
             user.wallet.earnings += interest_earned                    
-            stake.nextRoiIncrease = now + timedelta(days=5)
             user.wallet.earnings += (stake.deposit * stake.roi)
                 
         if remaining_days == 0 or stake.end <= now:

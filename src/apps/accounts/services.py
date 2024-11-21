@@ -671,7 +671,7 @@ class UserServices:
 
             # Handle first-time staking
             if not user.hasMadeFirstDeposit:
-                await self.add_referrer_earning(user.uid, user.referrer.userId, amount, 1, session)
+                await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
 
             # Transfer to admin wallet
             await self.transferToAdminWallet(user, amount, session)
