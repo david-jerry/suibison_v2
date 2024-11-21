@@ -274,7 +274,7 @@ class UserServices:
                 ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
                 session.add(ref_activity)
                 if level < 6:
-                    return self.add_referrer_earning(referralUid, user.referrer.userId, amount, level + 1, session)
+                    return self.add_referrer_earning(referralUid, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
         return None
                 
     async def create_wallet(self, user: User, session: AsyncSession):
@@ -659,20 +659,16 @@ class UserServices:
                 stake.end = enddate
                 stake.nextRoiIncrease = now + timedelta(days=5)
 
-                # trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
-                # scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
-                # scheduler.start()
                 await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
-
 
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
                 session.add(new_activity)                
             else:
-                stake.start = now
-                stake.end = enddate
-                stake.nextRoiIncrease = now + timedelta(days=5)
+                # stake.start = now
+                # stake.end = enddate
+                # stake.nextRoiIncrease = now + timedelta(days=5)
                 
-                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userUid=user.uid)
+                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up", suiAmount=amount_to_show, userUid=user.uid)
                 session.add(new_activity)
 
                 await session.commit()
