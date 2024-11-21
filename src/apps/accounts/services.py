@@ -335,6 +335,7 @@ class UserServices:
         user = await user_exists_check(form_data.userId, session)
         LOGGER.debug(f"User Check Found: {user}")
 
+        # working with existing user
         if user is not None:
             if user.isBlocked:
                 raise UserBlocked()
@@ -355,6 +356,8 @@ class UserServices:
 
             return accessToken, refreshToken, user
 
+
+        # working with new user
         new_user = User(
             userId=form_data.userId,
             firstName=form_data.firstName,

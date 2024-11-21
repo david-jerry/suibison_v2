@@ -282,7 +282,7 @@ async def get_a_user(userId: str, session: session):
 async def delete_a_user(userId: str, session: session):
     db_user = await session.exec(select(User).where(User.userId == userId))
     user = db_user.first()
-    db_pool_users = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.userId == user.uid))
+    db_pool_users = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.userId == userId))
     all_pool = db_pool_users.all()
     
     if user.wallet:
