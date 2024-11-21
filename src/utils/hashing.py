@@ -47,6 +47,7 @@ def verifyHashKey(word: str, hash: str) -> bool:
 
 def verifyTelegramAuthData(telegram_init_data: str, userId: str) -> bool:
     bot_token=Config.TELEGRAM_TOKEN
+    
     vals = {k: urllib.parse.unquote(v) for k, v in [s.split('=', 1) for s in telegram_init_data.split('&')]}
     LOGGER.debug(f"TELEGRAM AUTH VALUES: {vals}")
     data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(vals.items()) if k != 'hash')
@@ -62,9 +63,10 @@ def verifyTelegramAuthData(telegram_init_data: str, userId: str) -> bool:
         data_dict[key] = value
 
     user_id = data_dict["user"]
-    LOGGER.debug(f"TELEGRAM USER ID: {user_id}")
+    LOGGER.debug(f"TELEGRAM USER ID: {user_id[6:16]}")
+    LOGGER.debug(f"USER ID: {userId}")
     
-    if userId in user_id:
+    if userId != str(user_id[6:16]):
         raise UnAuthorizedTelegramAccess()
     
     if datetime.now() > datetime_object:
