@@ -254,7 +254,7 @@ class UserServices:
                 db_res = await session.exec(select(UserReferral).where(UserReferral.userUid == referralUid).where(UserReferral.userId == referrer))
                 the_referred_user = db_res.first()
                 the_referred_user.reward = percentage * amount
-                ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userId=referrer)
+                ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
                 session.add(ref_activity)
                 if level < 6:
                     return self.add_referrer_earning(referralUid, user.referrer.userId, amount, level + 1, session)
@@ -574,7 +574,7 @@ class UserServices:
         
         txDigest = await self.transferFromAdminWallet(withdrawal_wallet, (withdawable_amount * 10**9), user, session)
 
-        new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userId=user.userId)
+        new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
         session.add(new_activity)
 
         # Share another 10% to the global matrix pool
@@ -590,7 +590,7 @@ class UserServices:
         if active_matrix_pool_or_new is not None:
             active_matrix_pool_or_new.poolAmount += matrix_pool_amount
         
-        new_activity = Activities(activityType=ActivityType.MATRIXPOOL, strDetail="Matrix Pool amount topped up", suiAmount=matrix_pool_amount, userId=user.userId)
+        new_activity = Activities(activityType=ActivityType.MATRIXPOOL, strDetail="Matrix Pool amount topped up", suiAmount=matrix_pool_amount, userUid=user.uid)
         session.add(new_activity)
 
         await session.commit()
@@ -600,7 +600,7 @@ class UserServices:
         try:
             transResponse = await SUI.paySui(token_meter.address, withdrawal_wallet, withdawable_amount, 10000, coins)
 
-            new_activity = Activities(activityType=ActivityType.WITHDRAWAL, strDetail="New withdrawal", suiAmount=withdawable_amount, userId=user.userId)
+            new_activity = Activities(activityType=ActivityType.WITHDRAWAL, strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
             session.add(new_activity)
 
             return transResponse.txBytes
@@ -647,14 +647,14 @@ class UserServices:
                 await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
 
 
-                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
+                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
                 session.add(new_activity)                
             else:
                 stake.start = now
                 stake.end = enddate
                 stake.nextRoiIncrease = now + timedelta(days=5)
                 
-                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userId=user.userId)
+                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Top UUp", suiAmount=amount_to_show, userUid=user.uid)
                 session.add(new_activity)
 
                 await session.commit()

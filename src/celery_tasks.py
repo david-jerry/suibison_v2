@@ -41,7 +41,7 @@ async def run_post_celery_config():
     celery_app.add_periodic_task(
         schedule=crontab(minute="0", hour="*"),
         name="fetch_sui_usd_price_hourly",
-        sig=celery_app.signature("fetch_sui_usd_price_hourly") 
+        sig=celery_app.signature(name="fetch_sui_usd_price_hourly") 
     ) #fetch_sui_usd_price_hourly.s()
 
     # Session = sessionmaker(
