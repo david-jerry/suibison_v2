@@ -605,12 +605,12 @@ class UserServices:
             percentage = Decimal(0.01)
 
         # Save the referral level down to the 5th level in redis for improved performance
-        user.wallet.earnings += percentage * amount
-        user.wallet.availableReferralEarning += percentage * amount
+        user.wallet.earnings += Decimal(percentage * amount)
+        user.wallet.availableReferralEarning += Decimal(percentage * amount)
         
-        LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {percentage * amount}")
+        LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         
-        referral.reward = percentage * amount
+        referral.referrer.reward = Decimal(percentage * amount)
         
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
         
@@ -642,9 +642,9 @@ class UserServices:
 
         # Check if there are weeks to be added
         if weeks_earned > 0:
-            user.wallet.earnings += user.wallet.weeklyRankEarnings * weeks_earned
-            user.wallet.totalRankBonus += user.wallet.weeklyRankEarnings * weeks_earned
-            user.wallet.expectedRankBonus += user.wallet.weeklyRankEarnings * weeks_earned
+            user.wallet.earnings += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
+            user.wallet.totalRankBonus += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
+            user.wallet.expectedRankBonus += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
 
             # Update lastRankEarningAddedAt to reflect the latest calculation
             user.lastRankEarningAddedAt = now - timedelta(days=days_since_last_earning % 7)
