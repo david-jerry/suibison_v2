@@ -3,8 +3,11 @@ from contextlib import asynccontextmanager
 import pprint
 
 from telegram import Update
-from src.apps.accounts.tasks import fetch_sui_price
+from celery.schedules import crontab
+
+from src.apps.accounts.tasks import fetch_sui_price, fetch_sui_usd_price_hourly
 from src.db.engine import init_db
+from src.celery_tasks import celery_app
 from src.utils.logger import LOGGER
 from src.middleware import register_middleware
 from src.config.settings import Config
@@ -60,12 +63,13 @@ async def life_span(app: FastAPI):
     LOGGER.info("Server is running")
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
     await init_db()
-    try:
-        await fetch_sui_price()
-    except Exception as e:
-        LOGGER.debug(f"SUI Balance Error: {pprint.pprint(e, indent=4, depth=4)}")
+    # celery_app.start()
+    
+    # try:
+    #     await fetch_sui_price()
+    # except Exception as e:
+    #     LOGGER.debug(f"SUI Balance Error: {pprint.pprint(e, indent=4, depth=4)}")
     yield
     LOGGER.info("Server has stopped")
 

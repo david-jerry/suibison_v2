@@ -1,3 +1,4 @@
+import pprint
 from typing import AsyncGenerator
 from sqlalchemy import text
 
@@ -36,6 +37,7 @@ async def get_session() -> AsyncGenerator[AsyncSession,  None]:
             yield session
         except Exception as e:
             LOGGER.debug("Database session error")
+            LOGGER.error(pprint.pprint(e, indent=4, depth=4))
             await session.rollback()
             raise
         finally:

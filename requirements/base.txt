@@ -13,7 +13,7 @@ bcrypt==4.0.1
 bech32==1.2.0
 bip-utils==2.9.3
 ccxt==4.4.23
-celery
+celery[beat]
 cloudinary
 dnspython
 fastapi[all]==0.115.4

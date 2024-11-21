@@ -24,6 +24,7 @@ from src.apps.accounts.dependencies import user_exists_check
 from src.apps.accounts.enum import ActivityType
 from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
 from src.apps.accounts.schemas import AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserUpdateSchema, Wallet
+from src.celery_beat import TemplateScheduleSQLRepository
 from src.utils.calculations import get_rank
 from src.utils.sui_json_rpc_apis import SUI
 from src.errors import ActivePoolNotFound, InsufficientBalance, InvalidCredentials, InvalidStakeAmount, InvalidTelegramAuthData, OnlyOneTokenMeterRequired, ReferrerNotFound, StakingExpired, TokenMeterDoesNotExists, TokenMeterExists, UserAlreadyExists, UserBlocked, UserNotFound
@@ -39,24 +40,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from sui_python_sdk.wallet import SuiWallet
 
 now = datetime.now()
-scheduler = BackgroundScheduler({
-    "apscheduler.jobstores.default": {
-        "type": "sqlalchemy",
-        "url": Config.DATABASE_URL
-    },
-    'apscheduler.executors.default': {
-        'class': 'apscheduler.executors.pool:ThreadPoolExecutor',
-        'max_workers': '50'
-    },
-    'apscheduler.executors.processpool': {
-        'type': 'processpool',
-        'max_workers': '20'
-    },
-    'apscheduler.job_defaults.coalesce': 'false',
-    'apscheduler.job_defaults.max_instances': '12',
-    'apscheduler.timezone': 'UTC',
-})
-
+celery_beat = TemplateScheduleSQLRepository()
 
 class AdminServices:
     async def createTokenRecord(self, form_data: TokenMeterCreate, session: AsyncSession):
@@ -657,9 +641,11 @@ class UserServices:
                 stake.end = enddate
                 stake.nextRoiIncrease = now + timedelta(days=5)
 
-                trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
-                scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
-                scheduler.start()
+                # trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
+                # scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
+                # scheduler.start()
+                await celery_beat.save(tasks_args=[user, session], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=now + timedelta(days=100))
+
 
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)
                 session.add(new_activity)                
@@ -689,7 +675,8 @@ class UserServices:
 
             # Transfer to admin wallet
             await self.transferToAdminWallet(user, session)
-            return False, amount_to_show
+        elif Decimal(0.000000000) <= amount:
+            pass
         
 
     async def stake_sui(self, user: User, session: AsyncSession):
@@ -719,36 +706,131 @@ class UserServices:
         await session.refresh(user)
 
 
-    
-    async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
-        """
-        This calculates and updates the interest on a stake until its expiry date.
 
-        Args:
-            session: The database session object.
-            stake: The UserStaking object representing the stake.
-        """
-        now = datetime.now()
-        remaining_days = (stake.end - now).days
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    # async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
+    #     """
+    #     This calculates and updates the interest on a stake until its expiry date.
+
+    #     Args:
+    #         session: The database session object.
+    #         stake: The UserStaking object representing the stake.
+    #     """
+    #     now = datetime.now()
+    #     remaining_days = (stake.end - now).days
         
-        # loop this task until staking expiry date has reached then stop it
-        if remaining_days > 0:
-            # calculate interest based on remaining days and ensure the roi is less than 4%
-            if (stake.roi < Decimal(0.04)) and (stake.nextRoiIncrease == now):
-                new_roi = stake.roi + Decimal(0.005)        
-                stake.roi = new_roi        
-            interest_earned = stake.deposit * new_roi
-            user.wallet.earnings += interest_earned                    
-            stake.nextRoiIncrease = now + timedelta(days=5)
-            user.wallet.earnings += (stake.deposit * stake.roi)
+    #     # loop this task until staking expiry date has reached then stop it
+    #     if remaining_days > 0:
+    #         # calculate interest based on remaining days and ensure the roi is less than 4%
+    #         if (stake.roi < Decimal(0.04)) and (stake.nextRoiIncrease == now):
+    #             new_roi = stake.roi + Decimal(0.005)        
+    #             stake.roi = new_roi        
+    #         interest_earned = stake.deposit * new_roi
+    #         user.wallet.earnings += interest_earned                    
+    #         stake.nextRoiIncrease = now + timedelta(days=5)
+    #         user.wallet.earnings += (stake.deposit * stake.roi)
                 
-        if remaining_days == 0 or stake.end <= now:
-            stake.roi = 0.01
-            stake.nextRoiIncrease = None
+    #     if remaining_days == 0 or stake.end <= now:
+    #         stake.roi = 0.01
+    #         stake.nextRoiIncrease = None
             
-        await session.commit()
-        await session.refresh(stake)
-        return None
+    #     await session.commit()
+    #     await session.refresh(stake)
+    #     return None
         
 
         

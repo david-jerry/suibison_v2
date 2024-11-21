@@ -40,6 +40,8 @@ def create_cron_schedule(scheduling_type: str, start_datetime: datetime, end_dat
         })
     elif scheduling_type == "hourly":
         cron_kwargs.update({"hour": "*", "minute": start_time.minute})
+    elif scheduling_type == "minutes":
+        cron_kwargs.update({"minute": start_time.minute})
     else:
         raise ValueError("Invalid scheduling type")
 
@@ -60,7 +62,7 @@ class TemplateScheduleSQLRepository:
         tasks_args: List[str],
         tasks_kwargs: Any,
         task_name: str,
-        schedule_type: Literal["daily", "weekly", "weekdays", "monthly", "yearly", "once", "hourly"],
+        schedule_type: Literal["daily", "weekly", "weekdays", "monthly", "yearly", "once", "hourly", "minutes"],
         start_datetime: datetime,
         end_datetime: datetime,
         session: AsyncSession,
