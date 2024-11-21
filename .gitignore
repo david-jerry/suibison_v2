@@ -1,5 +1,6 @@
 # Enviroment Files
 .env
+.env.local
 .env.production
 
 # Byte-compiled / optimized / DLL files
