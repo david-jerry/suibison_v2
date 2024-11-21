@@ -29,6 +29,13 @@ async def start(update: Update, context: CallbackContext):
     asyncio.set_event_loop(loop)
     
     LOGGER.debug(f"ARGS: {args}")
+    
+    username = "User"
+    if user.first_name:
+        username = user.first_name
+    elif user.last_name:
+        username = user.last_name
+        
     if args is not None and len(args) > 0:
         startapp_param = args[0]
 
@@ -65,9 +72,9 @@ async def start(update: Update, context: CallbackContext):
         response = requests.post(url, headers=headers, json=data)
         LOGGER.debug(response.json())
         if response.status_code == 201:
-            await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+            await update.message.reply_text(f"Hello {username}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
         else:
-            await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
+            await update.message.reply_text(f"Hello {username}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
     else:
         url = f"{Config.DOMAIN}/v2/auth/start"
         LOGGER.debug(f"START URL: {url}")
@@ -93,10 +100,11 @@ async def start(update: Update, context: CallbackContext):
         # Make the POST request
         response = requests.post(url, headers=headers, json=data)
         LOGGER.debug(response.json())
+         
         if response.status_code == 201:
-            await update.message.reply_text(f"Hello {user.id}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
+            await update.message.reply_text(f"Hello {username}, \n<strong>LUNCH MINIAPP</strong>", parse_mode=ParseMode.HTML, reply_markup=reply_markup)
         else:
-            await update.message.reply_text(f"Hello {user.id}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
+            await update.message.reply_text(f"Hello {username}, \n<strong>Registration Failed</strong>", parse_mode=ParseMode.HTML)
 
 # Register the handler
 telegramApp.add_handler(CommandHandler("start", start))

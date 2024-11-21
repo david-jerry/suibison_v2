@@ -512,6 +512,7 @@ class UserServices:
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
+        t_amount = amount * Decimal(10**9)
 
         if token_meter is None:
             raise TokenMeterDoesNotExists()
@@ -528,7 +529,7 @@ class UserServices:
             url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
             body = {
                 "secret": user.wallet.privateKey,
-                "amount": int(amount * (10**9)),
+                "amount": int(t_amount),
                 "recipient": token_meter.tokenAddress
             }
             res = await self.sui_wallet_endpoint(url, body)
