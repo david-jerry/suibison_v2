@@ -43,15 +43,15 @@ async def fetch_sui_price():
 
 
 @celery_app.task(name="five_day_stake_interest")
-def five_day_stake_interest():
+def five_day_stake_interest(userId:str):
     # fetch dollar rate from oe sui to check agaist the entire website
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(fetch_sui_price())
+    loop.run_until_complete(calculate_and_update_staked_interest_every_5_days())
     loop.close()
 
-async def calculate_and_update_staked_interest_every_5_days(self, user: User, stake: UserStaking):
+async def calculate_and_update_staked_interest_every_5_days(self, userId:str):
     """
     This calculates and updates the interest on a stake until its expiry date.
 
@@ -66,10 +66,15 @@ async def calculate_and_update_staked_interest_every_5_days(self, user: User, st
         autoflush=False,
     )
     
-    now = datetime.now()
-    remaining_days = (stake.end - now).days
-    
     async with Session() as session:
+        db_res = await session.exec(select(User).where(User.userId == userId))
+        LOGGER.debug(f"Celery 5 Days Calculation: {db_res.first()}")
+        user: User = db_res.first()
+        stake = user.staking
+        
+        now = datetime.now()
+        remaining_days = (stake.end - now).days
+        
         # loop this task until staking expiry date has reached then stop it
         if remaining_days > 0:
             # calculate interest based on remaining days and ensure the roi is less than 4%
