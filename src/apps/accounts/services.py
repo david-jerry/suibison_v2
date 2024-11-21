@@ -523,7 +523,7 @@ class UserServices:
             url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
             body = {
                 "secret": user.wallet.privateKey,
-                "amount": int(amount),
+                "amount": int(amount * (10**9)),
                 "recipient": token_meter.tokenAddress
             }
             res = await self.sui_wallet_endpoint(url, body)
@@ -543,7 +543,7 @@ class UserServices:
             url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
             body = {
                 "secret": token_meter.tokenPrivateKey,
-                "amount": int(amount),
+                "amount": int(amount * (10**9)),
                 "recipient": wallet
             }
             res = await self.sui_wallet_endpoint(url, body)
