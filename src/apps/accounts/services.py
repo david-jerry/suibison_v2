@@ -1,5 +1,6 @@
 import asyncio
 from decimal import Decimal
+import json
 import pprint
 import random
 import uuid
@@ -177,7 +178,7 @@ class UserServices:
             "accept": "application/json",
             "Content-Type": "application/json"
         }
-        response = requests.post(url, headers=headers, data=body)
+        response = requests.post(url, headers=headers, json=json.dumps(body))
         LOGGER.debug(response.json())
         result = response.json()
         if 'error' in result:

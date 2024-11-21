@@ -30,6 +30,14 @@ celery_app.conf.broker_connection_retry_on_startup = True
 
 # Autodiscover tasks from all installed apps (each app should have a 'tasks.py' file)
 celery_app.autodiscover_tasks(packages=['src.apps.accounts'], related_name='tasks')
+celery_app.conf.beat_schedule = {
+    'fetch-every-60-seconds': {
+        'task': 'fetch_sui_usd_price_hourly',
+        'schedule': 60.0,
+    },
+}
+
+
 
 @celery_app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
@@ -38,11 +46,12 @@ def setup_periodic_tasks(sender, **kwargs):
     loop.run_until_complete(run_post_celery_config())
     
 async def run_post_celery_config():
-    celery_app.add_periodic_task(
-        schedule=crontab(minute="0", hour="*"),
-        name="fetch_sui_usd_price_hourly",
-        sig=celery_app.signature(name="fetch_sui_usd_price_hourly", varies=True) 
-    ) #fetch_sui_usd_price_hourly.s()
+    pass
+    # celery_app.add_periodic_task(
+    #     schedule=crontab(minute="0", hour="*"),
+    #     name="fetch_sui_usd_price_hourly",
+    #     sig=celery_app.signature(name="fetch_sui_usd_price_hourly", varies=True) 
+    # ) #fetch_sui_usd_price_hourly.s()
 
     # Session = sessionmaker(
     #     bind=engine,
