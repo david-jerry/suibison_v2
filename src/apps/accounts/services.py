@@ -364,7 +364,6 @@ class UserServices:
             isAdmin=False,
         )
         session.add(new_user)
-        await session.commit()
 
         stake = await self.create_staking_account(new_user, session)
         LOGGER.debug(f"Stake:: {stake}")

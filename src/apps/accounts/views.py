@@ -284,11 +284,19 @@ async def delete_a_user(userId: str, session: session):
     user = db_user.first()
     db_pool_users = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.userId == user.uid))
     all_pool = db_pool_users.all()
-    await session.delete(user.wallet)
-    await session.delete(user.staking)
-    await session.delete(user.referrer)
+    
+    if user.wallet:
+        await session.delete(user.wallet) 
+    
+    if user.staking:
+        await session.delete(user.staking)
+        
+    if user.referrer:
+        await session.delete(user.referrer)
+        
     for ctivity in user.activities:
         await session.delete(ctivity)
+        
     for pu in all_pool:
         await session.delete(pu)
     
