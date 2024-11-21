@@ -631,7 +631,7 @@ class UserServices:
                 await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
 
             # Transfer to admin wallet
-            await self.transferToAdminWallet(user, session)
+            await self.transferToAdminWallet(user, amount, session)
             enddate = now + timedelta(days=100)
             stake = user.staking           
             
