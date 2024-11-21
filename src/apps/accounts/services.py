@@ -525,7 +525,6 @@ class UserServices:
                 await session.commit()
                 user.staking.deposit -= pendingTransaction.amount
                 user.staking.deposit += amount
-
         elif Decimal(0.000000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
@@ -698,7 +697,7 @@ class UserServices:
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
         LOGGER.info(F"AMOUNT TO SEND TO ADMIN: {amount}")
-        t_amount = round(amount * Decimal(10**9))
+        t_amount = round(amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
         LOGGER.debug(f"FORMATTED AMOUNT: {t_amount}")
 
         if token_meter is None:
@@ -747,6 +746,7 @@ class UserServices:
 
     async def withdrawToUserWallet(self, user: User, withdrawal_wallet: str, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
+        usdPrice = await get_sui_usd_price()
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
 
@@ -757,14 +757,16 @@ class UserServices:
         try:
             url = "https://suiwallet.sui-bison.live/wallet/balance"
             body = {
-                "address": token_meter.tokenAddress
+                "address": user.wallet.address
             }
             res = await self.sui_wallet_endpoint(url, body)
-            LOGGER.debug(f"Admin Balance Check: {pprint.pprint(res)}")
-            amount = Decimal(int(res["balance"]) / 10**9)
-        except Exception:
+            LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
+            amount = Decimal(Decimal(res["balance"]) / 10**9)
+            LOGGER.debug(f"User {user.userId} Balance: {amount:.9f}")
+        except Exception as e:
+            LOGGER.error(f"CHECK BAL: {str(e)}")
             amount = Decimal(0.000000000)
-
+            
         if amount < user.wallet.earning:
             raise InsufficientBalance()
 
@@ -773,19 +775,28 @@ class UserServices:
         # perform the calculatios in the ratio 60:20:10:10
         withdawable_amount = user.wallet.earnings * Decimal(0.6)
         redepositable_amount = user.wallet.earnings * Decimal(0.2)
-        token_meter_amount = user.wallet.earnings * Decimal(0.1)
+        token_meter_amount = ((user.wallet.earnings * Decimal(0.1)) / usdPrice) / token_meter.tokenPrice
         matrix_pool_amount = user.wallet.earnings * Decimal(0.1)
+        t_amount = round(withdawable_amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
 
+
+        digest, status = await self.transferFromAdminWallet(withdrawal_wallet, t_amount, user, session)
+        
+        if status == "faiilure":
+            raise HTTPException(status_code=400, detail=status)
+        
+        new_activity = Activities(activityType=ActivityType.WITHDRAWAL,
+                                      strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
+        session.add(new_activity)
         # Top up the meter balance with the users amount and update the amount
         # invested by the user into the token meter
         token_meter.totalAmountCollected += token_meter_amount
         user.wallet.totalTokenPurchased += token_meter_amount
-        user.wallet.availableReferralEarning = 0.00
+        user.wallet.availableReferralEarning += 0.00
+        user.wallet.totalWithdrawn += withdawable_amount
 
         # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.staking.deposit += redepositable_amount
-
-        txDigest = await self.transferFromAdminWallet(withdrawal_wallet, (withdawable_amount * 10**9), user, session)
 
         new_activity = Activities(activityType=ActivityType.DEPOSIT,
                                   strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
@@ -811,18 +822,6 @@ class UserServices:
 
         await session.commit()
         await session.refresh(active_matrix_pool_or_new)
-
-        # transfer the remaining 60% to the users external wallet address
-        try:
-            transResponse = await SUI.paySui(token_meter.address, withdrawal_wallet, withdawable_amount, 10000, coins)
-
-            new_activity = Activities(activityType=ActivityType.WITHDRAWAL,
-                                      strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
-            session.add(new_activity)
-
-            return transResponse.txBytes
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
 
     # ##### UNVERIFIED ENDING
 
