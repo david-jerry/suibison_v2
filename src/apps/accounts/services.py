@@ -246,7 +246,10 @@ class UserServices:
             # if the referrer is not none and has atleast one referral
             if user is not None and user.totalReferrals > Decimal(0):                
                 for ref in referrals:
-                    ref_deposit += ref.user.staking.deposit
+                    refd_db = await session.exec(select(User).where(User.userId == ref.theirUserId))
+                    refd = refd_db.first()
+                    if refd is not None:
+                        ref_deposit += refd.staking.deposit
                     
                 if (ref_deposit >= user.staking.deposit) and not user.usedSpeedBoost:
                     user.staking.roi += Decimal(0.005)
@@ -647,10 +650,6 @@ class UserServices:
             user.staking.deposit += amount_to_show
             await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
             
-            # Handle first-time staking
-            if not user.hasMadeFirstDeposit:
-                await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
-
             # Transfer to admin wallet
             await self.transferToAdminWallet(user, amount, session)
             enddate = now + timedelta(days=100)
@@ -665,7 +664,10 @@ class UserServices:
                 await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
 
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
-                session.add(new_activity)                
+                session.add(new_activity)         
+                
+                await session.commit()
+                await session.refresh(stake)                       
             else:
                 # stake.start = now
                 # stake.end = enddate
@@ -675,7 +677,6 @@ class UserServices:
                 session.add(new_activity)
 
                 await session.commit()
-                await session.refresh(stake)
         elif Decimal(0.000000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
@@ -687,15 +688,21 @@ class UserServices:
             user.staking.deposit += amount_to_show
             await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-            # Handle first-time staking
-            if not user.hasMadeFirstDeposit:
-                await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
+            # # Handle first-time staking
+            # if not user.hasMadeFirstDeposit:
+            #     await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
 
             # Transfer to admin wallet
             await self.transferToAdminWallet(user, amount, session)
+            
+            await session.commit()
         elif Decimal(0.000000000) <= amount:
             pass
         
+        # Handle first-time staking
+        if not user.hasMadeFirstDeposit:
+            await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
+
     async def stake_sui(self, user: User, session: AsyncSession):
         # checks the user balance
         try:
