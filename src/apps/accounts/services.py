@@ -249,6 +249,7 @@ class UserServices:
                     
                 if (ref_deposit >= user.staking.deposit) and not user.usedSpeedBoost:
                     user.staking.roi += Decimal(0.005)
+                    user.usedSpeedBoost = True
             ##### End Speed Boost
 
 
@@ -641,6 +642,7 @@ class UserServices:
             token_meter.totalAmountCollected += sbt_amount
             token_meter.totalDeposited += amount
             user.wallet.totalDeposit += amount
+            user.wallet.balance += amount
             user.staking.deposit += amount_to_show
             await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
             
