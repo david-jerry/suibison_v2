@@ -49,3 +49,7 @@ Sui is a layer-1 blockchai optimizing for low-latency blockchain transfers. Its 
     ```shell
     cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui
     ```
+
+## DOKKU LOG SPECIFIC
+
+dokku logs node-js-app -t -p web
