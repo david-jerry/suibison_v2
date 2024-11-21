@@ -466,7 +466,10 @@ class UserServices:
             sbt_amount = Decimal(amount * Decimal(0.1))
             
             try:
-                await self.transferToAdminWallet(user, amount, session)
+                digest, status = await self.transferToAdminWallet(user, amount, session)
+                
+                if status == "failure":
+                    raise HTTPException(status_code=400, detail=status)
                 
                 if pendingTransaction is not None:
                     user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
@@ -529,7 +532,11 @@ class UserServices:
             
             try:
                 # Transfer to admin wallet
-                await self.transferToAdminWallet(user, amount, session)
+                digest, status = await self.transferToAdminWallet(user, amount, session)
+                
+                if status == "failure":
+                    raise HTTPException(status_code=400, detail=status)
+
                 if pendingTransaction is not None:
                     user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
                     await session.commit()
@@ -713,7 +720,7 @@ class UserServices:
                 "recipient": token_meter.tokenAddress
             }
             res = await self.sui_wallet_endpoint(url, body)
-            return res["transaction"]["result"]["digest"]
+            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -734,7 +741,7 @@ class UserServices:
                 "recipient": wallet
             }
             res = await self.sui_wallet_endpoint(url, body)
-            return res["transaction"]["result"]["digest"]
+            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
