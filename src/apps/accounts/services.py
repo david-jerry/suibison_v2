@@ -608,6 +608,7 @@ class UserServices:
         # Save the referral level down to the 5th level in redis for improved performance
         user.wallet.earnings += Decimal(percentage * amount)
         user.wallet.availableReferralEarning += Decimal(percentage * amount)
+        user.wallet.totalReferralEarnings += Decimal(percentage * amount)
         
         LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         
