@@ -644,7 +644,7 @@ class UserServices:
                 # trigger = CronTrigger(hour=now.hour, minute=now.minute, second=now.second, end_date=enddate.date() + timedelta(days=1))
                 # scheduler.add_job(self.calculate_and_update_staked_interest_every_5_days, trigger, args=[user, session, stake])
                 # scheduler.start()
-                await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", task_sig=f"five_day_stake_interest_{user.userId}", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
+                await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
 
 
                 new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New Stake Run Started", suiAmount=amount_to_show, userId=user.userId)

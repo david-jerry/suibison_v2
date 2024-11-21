@@ -62,7 +62,6 @@ class TemplateScheduleSQLRepository:
         tasks_args: List[str],
         tasks_kwargs: Any,
         task_name: str,
-        task_sig: str,
         schedule_type: Literal["daily", "weekly", "weekdays", "monthly", "yearly", "once", "hourly", "minutes"],
         start_datetime: datetime,
         end_datetime: datetime,
@@ -90,7 +89,6 @@ class TemplateScheduleSQLRepository:
         # Create a CeleryBeat entry
         periodic_task = CeleryBeat(
             task_name=task_name,
-            task_sig=task_sig,
             task_args=json.dumps(tasks_args),
             task_kwargs=json.dumps(jsonable_encoder(tasks_kwargs)),
             crontab=json.dumps(cron_dict),

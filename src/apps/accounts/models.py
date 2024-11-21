@@ -21,7 +21,7 @@ class CeleryBeat(SQLModel, table=True):
     )
 
     task_name: str = Field(max_length=500, nullable=False, description="Name of the task")
-    task_sig: str = Field(max_length=500, nullable=False, description="Signature for the task")
+    # task_sig: str = Field(max_length=500, nullable=True, description="Signature for the task")
     task_args: Optional[str] = Field(default="{}", max_length=500, description="JSON-formatted task arguments")
     task_kwargs: Optional[str] = Field(default="{}", max_length=500, description="JSON-formatted task keyword arguments")
     crontab: str = Field(max_length=200, nullable=False, description="Cron expression for scheduling")
