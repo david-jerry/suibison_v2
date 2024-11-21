@@ -60,7 +60,7 @@ async def run_post_celery_config():
                 celery_app.add_periodic_task(
                     schedule=crontab(**crondict),
                     name=task.task_name,
-                    sig=celery_app.signature(task.task_name),
+                    sig=celery_app.signature(task.task_sig),
                     args=(arg for arg in task.task_args)
                 )
                 # celery_app.conf.beat_schedule[task.task_name] = {
@@ -72,5 +72,5 @@ async def run_post_celery_config():
         LOGGER.debug("Periodic tasks configured successful")
     except Exception as e:
         LOGGER.error(f"Error setting the periodic tasks")
-        raise
+        
         
