@@ -264,7 +264,7 @@ class WalletBaseSchema(BaseModel):
     # phrase: str
     # privateKey: str
 
-    # balance: Decimal = Decimal(0)
+    balance: Decimal = Decimal(0)
     earnings: Decimal = Decimal(0)
     availableReferralEarning: Decimal = Decimal(0)
     expectedRankBonus: Decimal = Decimal(0)
@@ -276,7 +276,22 @@ class WalletBaseSchema(BaseModel):
     totalFastBonus: Decimal = Decimal(0)
     totalWithdrawn: Decimal = Decimal(0)
     totalReferralEarnings: Decimal = Decimal(0)
+    totalreferralBonus: Decimal = Decimal(0)
 
+    @staticmethod
+    def calculate_referral_bonus(dob: Optional[datetime]) -> int:
+        if dob:
+            today = datetime.today().date()
+            age = today.year - dob.year - (
+                (today.month, today.day) < (dob.month, dob.day)
+            )
+            return age
+        return 0
+
+    @classmethod
+    def from_orm(cls, user: "UserRead"):
+        user_dict = user.model_dump()
+        user_dict["totalreferralBonus"] = cls.calculate_age(user.dob)
 
 class WalletRead(WalletBaseSchema):
     uid: uuid.UUID

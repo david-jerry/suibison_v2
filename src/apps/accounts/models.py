@@ -159,6 +159,7 @@ class UserWallet(SQLModel, table=True):
     totalFastBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
     totalWithdrawn: Decimal = Field(decimal_places=9, default=Decimal(0.00))
     totalReferralBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
+    totalReferralEarnings: Decimal = Field(decimal_places=9, default=Decimal(0), nullable=True)
 
     # Foreign Key to User
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
