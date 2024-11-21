@@ -264,7 +264,7 @@ class WalletBaseSchema(BaseModel):
     # phrase: str
     # privateKey: str
 
-    balance: Decimal = Decimal(0)
+    # balance: Decimal = Decimal(0)
     earnings: Decimal = Decimal(0)
     availableReferralEarning: Decimal = Decimal(0)
     expectedRankBonus: Decimal = Decimal(0)

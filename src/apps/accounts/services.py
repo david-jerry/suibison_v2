@@ -226,7 +226,7 @@ class UserServices:
         # check for fast boost and credit the users wallet balance accordingly
         if referring_user.joined < fast_boost_time and len(referrals) >= 2:
             referring_user.wallet.totalFastBonus += Decimal(3.00)
-            referring_user.wallet.balance += Decimal(3.00)
+            referring_user.staking.deposit += Decimal(3.00)
                             
         await self.create_referral_level(new_user, referring_user, 1, session)
         return None
@@ -235,6 +235,23 @@ class UserServices:
         if referrer is not None:                
             db_result = await session.exec(select(User).where(User.userId == referrer))
             user = db_result.first()
+            
+            ###### check for speed boost
+            # fetch referrals for the referrer if available
+            ref_db_result = await session.exec(select(UserReferral).where(UserReferral.userId == referrer))
+            referrals = ref_db_result.all()
+            
+            ref_deposit = Decimal(0.000000000)
+            
+            if user is not None:                
+                for ref in referrals:
+                    ref_deposit += ref.user.staking.deposit
+                    
+                if (ref_deposit >= user.staking.deposit) and not user.usedSpeedBoost:
+                    user.staking.roi += Decimal(0.005)
+            ##### End Speed Boost
+
+
             
             percentage = Decimal(0.1)
             if level == 2:
@@ -346,7 +363,7 @@ class UserServices:
 
     async def login_user(self, form_data: UserLoginSchema, session: AsyncSession) -> User:
         # validate the telegram string
-        if not verifyTelegramAuthData(form_data.telegram_init_data):
+        if not verifyTelegramAuthData(form_data.telegram_init_data, form_data.userId):
             raise InvalidTelegramAuthData()
                 
         user = await user_exists_check(form_data.userId, session)
@@ -623,9 +640,10 @@ class UserServices:
             # Update SBT records
             token_meter.totalAmountCollected += sbt_amount
             token_meter.totalDeposited += amount
+            user.wallet.totalDeposit += amount
             user.staking.deposit += amount_to_show
             await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
-
+            
             # Handle first-time staking
             if not user.hasMadeFirstDeposit:
                 await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
@@ -666,6 +684,7 @@ class UserServices:
             # Update SBT records
             token_meter.totalAmountCollected += sbt_amount
             token_meter.totalDeposited += amount
+            user.wallet.totalDeposit += amount
             user.staking.deposit += amount_to_show
             await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
@@ -678,7 +697,6 @@ class UserServices:
         elif Decimal(0.000000000) <= amount:
             pass
         
-
     async def stake_sui(self, user: User, session: AsyncSession):
         # checks the user balance
         try:

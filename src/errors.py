@@ -53,6 +53,17 @@ class TokenExpired(SuiBisonException):
     pass
 
 
+class TelegramAuthDataTokenExpired(SuiBisonException):
+    """Telegram mini app token expired"""
+    pass
+
+
+class UnAuthorizedTelegramAccess(SuiBisonException):
+    """Unauthorized telegram auth string used for the wrong user"""
+    pass
+
+
+
 class InvalidAuthenticationScheme(SuiBisonException):
     """Invalid authentication scheme not Bearer"""
     pass
@@ -211,6 +222,13 @@ def register_all_errors(app: FastAPI):
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"message": "Token is invalid.", "error_code": "invalid_token"}
         )
+        
+    @app.exception_handler(UnAuthorizedTelegramAccess)
+    async def UnAuthorizedTelegramAccessError(request: Request, exc: UnAuthorizedTelegramAccess):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"message": "Telegram auth string used for the wrong userId.", "error_code": "invalid_telegram_auth_string"}
+        )
 
     @app.exception_handler(StakingExpired)
     async def StakingExpiredError(request: Request, exc: StakingExpired):
@@ -274,6 +292,13 @@ def register_all_errors(app: FastAPI):
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
             content={"message": "Token has expired.", "error_code": "expired_token"}
+        )
+        
+    @app.exception_handler(TelegramAuthDataTokenExpired)
+    async def TelegramAuthDataTokenExpiredError(request: Request, exc: TelegramAuthDataTokenExpired):
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"message": "Telegran MiniAPP Token has expired.", "error_code": "mini_app_expired_token"}
         )
 
     @app.exception_handler(TokenMeterExists)

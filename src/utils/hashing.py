@@ -8,7 +8,7 @@ import uuid
 from passlib.context import CryptContext
 import jwt
 from src.config.settings import Config
-from src.errors import InvalidToken, TokenExpired
+from src.errors import InvalidToken, TelegramAuthDataTokenExpired, TokenExpired, UnAuthorizedTelegramAccess
 from src.utils.logger import LOGGER
 from init_data_py import InitData
 
@@ -45,10 +45,29 @@ def verifyHashKey(word: str, hash: str) -> bool:
     correct = bcrypt_context.verify(word, hash)
     return correct
 
-def verifyTelegramAuthData(telegram_init_data: str) -> bool:
+def verifyTelegramAuthData(telegram_init_data: str, userId: str) -> bool:
     bot_token=Config.TELEGRAM_TOKEN
     vals = {k: urllib.parse.unquote(v) for k, v in [s.split('=', 1) for s in telegram_init_data.split('&')]}
+    LOGGER.debug(f"TELEGRAM AUTH VALUES: {vals}")
     data_check_string = '\n'.join(f"{k}={v}" for k, v in sorted(vals.items()) if k != 'hash')
+    auth_date_check = vals["auth_date"]
+    datetime_object = datetime.fromtimestamp(int(auth_date_check))
+    
+    data_list = data_check_string.strip().split('\n')
+
+    # Create a dictionary to store the parsed data
+    data_dict = {}
+    for pair in data_list:
+        key, value = pair.split('=')
+        data_dict[key] = value
+
+    user_id = data_dict["user"][0]
+    
+    if userId != user_id:
+        raise UnAuthorizedTelegramAccess()
+    
+    if datetime.now() > datetime_object:
+        raise TelegramAuthDataTokenExpired()
 
     secret_key = hmac.new("WebAppData".encode(), bot_token.encode(), hashlib.sha256).digest()
     h = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256)

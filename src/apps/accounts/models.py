@@ -57,6 +57,7 @@ class User(SQLModel, table=True):
 
     # Permissions
     isBlocked: bool = Field(default=False, description="When a user violates the rules of the project they get banned")
+    usedSpeedBoost: bool = Field(default=False, nullable=True, description="If a user has enabled their speed boost then they would no longer need it")
     isAdmin: bool = Field(default=False)
     isSuperuser: bool = Field(default=False, description="A superuser permission")
     hasMadeFirstDeposit: bool = Field(
