@@ -689,6 +689,7 @@ class UserServices:
             res = await self.sui_wallet_endpoint(url, body)
             LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
             amount = Decimal(int(res["balance"]) / 10**9)
+            LOGGER.debug(f"User {user.userId} Balance: {amount:.9f}")
         except Exception:
             amount = Decimal(0.000000000)
             

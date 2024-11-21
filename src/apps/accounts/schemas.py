@@ -313,6 +313,8 @@ class TokenMeterCreate(BaseModel):
     tokenPrivateKey: Optional[str] = None
     tokenPhrase: Optional[str] = None
     totalCap: Decimal = Decimal(0)
+    tokenPrice: Optional[Decimal] = Decimal(0.02)
+    
 
 
 class TokenMeterUpdate(BaseModel):
@@ -320,6 +322,7 @@ class TokenMeterUpdate(BaseModel):
     tokenPrivateKey: Optional[str] = None
     tokenPhrase: Optional[str] = None
     totalCap: Optional[Decimal] = None
+    tokenPrice: Optional[Decimal] = None
 
 
 class SuiDollarRate(BaseModel):
