@@ -177,7 +177,7 @@ class UserServices:
             "accept": "application/json",
             "Content-Type": "application/json"
         }
-        response = requests.post(url, headers=headers, json=body)
+        response = requests.post(url, headers=headers, data=body)
         LOGGER.debug(response.json())
         result = response.json()
         if 'error' in result:
