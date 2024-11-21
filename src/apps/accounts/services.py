@@ -243,7 +243,8 @@ class UserServices:
             
             ref_deposit = Decimal(0.000000000)
             
-            if user is not None:                
+            # if the referrer is not none and has atleast one referral
+            if user is not None and user.totalReferrals > Decimal(0):                
                 for ref in referrals:
                     ref_deposit += ref.user.staking.deposit
                     
