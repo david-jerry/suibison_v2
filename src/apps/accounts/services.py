@@ -555,7 +555,7 @@ class UserServices:
         
         # Handle first-time staking
         if not user.hasMadeFirstDeposit:
-            await self.add_referrer_earning(user.uid, user.referrer.userId if user.referrer else None, amount, 1, session)
+            await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
 
         await session.commit()
         await session.refresh(user)
