@@ -512,7 +512,9 @@ class UserServices:
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
+        LOGGER.info(F"AMOUNT TO SEND TO ADMIN: {amount}")
         t_amount = amount * Decimal(10**9)
+        LOGGER.debug(f"FORMATTED AMOUNT: {t_amount}")
 
         if token_meter is None:
             raise TokenMeterDoesNotExists()
