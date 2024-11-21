@@ -785,8 +785,7 @@ class UserServices:
         if status == "faiilure":
             raise HTTPException(status_code=400, detail=status)
         
-        new_activity = Activities(activityType=ActivityType.WITHDRAWAL,
-                                      strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
+        new_activity = Activities(activityType=ActivityType.WITHDRAWAL, strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
         session.add(new_activity)
         # Top up the meter balance with the users amount and update the amount
         # invested by the user into the token meter
@@ -798,26 +797,22 @@ class UserServices:
         # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.staking.deposit += redepositable_amount
 
-        new_activity = Activities(activityType=ActivityType.DEPOSIT,
-                                  strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
+        new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
         session.add(new_activity)
 
         # Share another 10% to the global matrix pool
-        active_matrix_pool_or_new = await session.exec(select(MatrixPool).where(MatrixPool.countDownTo >= now)).first()
+        active_matrix_pool_or_new = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now)).first()
 
         # confirm there is an active matrix pool to add another 10% of the earning into
         if active_matrix_pool_or_new is None:
-            active_matrix_pool_or_new = MatrixPool(poolAmount=matrix_pool_amount,
-                                                   countDownFrom=now, countDownTo=sevenDaysLater)
-
+            active_matrix_pool_or_new = MatrixPool(poolAmount=matrix_pool_amount, countDownFrom=now, countDownTo=sevenDaysLater)
             session.add(active_matrix_pool_or_new)
 
         # if there is no active matrix pool then create one for the next 7 days and add the 10% from the withdrawal into it
         if active_matrix_pool_or_new is not None:
             active_matrix_pool_or_new.poolAmount += matrix_pool_amount
 
-        new_activity = Activities(activityType=ActivityType.MATRIXPOOL,
-                                  strDetail="Matrix Pool amount topped up", suiAmount=matrix_pool_amount, userUid=user.uid)
+        new_activity = Activities(activityType=ActivityType.MATRIXPOOL, strDetail="Matrix Pool amount topped up", suiAmount=matrix_pool_amount, userUid=user.uid)
         session.add(new_activity)
 
         await session.commit()
