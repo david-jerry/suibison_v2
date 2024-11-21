@@ -5,7 +5,7 @@ from typing import Annotated
 from celery import Celery
 from celery.schedules import crontab
 from fastapi import Depends
-from src.celery_beat import TemplateScheduleSQLRepository
+# from src.celery_beat import TemplateScheduleSQLRepository
 from src.config.settings import Config
 from src.db import engine
 from src.utils.logger import LOGGER
@@ -13,7 +13,7 @@ from src.utils.logger import LOGGER
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-celery_beat = TemplateScheduleSQLRepository()
+# celery_beat = TemplateScheduleSQLRepository()
 
 # Initialize Celery with autodiscovery
 celery_app = Celery(
@@ -38,39 +38,40 @@ def setup_periodic_tasks(sender, **kwargs):
     loop.run_until_complete(run_post_celery_config())
     
 async def run_post_celery_config():
-    Session = sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-        autoflush=False,
-    )
     celery_app.add_periodic_task(
         schedule=crontab(minute="0", hour="*"),
         name="fetch_sui_usd_price_hourly",
         sig=celery_app.signature("fetch_sui_usd_price_hourly") 
     ) #fetch_sui_usd_price_hourly.s()
 
-    try:
-        async with Session() as session:
-            await_tasks = await celery_beat.get_periodic_taskks(session)
-            tasks = await_tasks
+    # Session = sessionmaker(
+    #     bind=engine,
+    #     class_=AsyncSession,
+    #     expire_on_commit=False,
+    #     autoflush=False,
+    # )
+    
+    # try:
+    #     async with Session() as session:
+    #         # await_tasks = await celery_beat.get_periodic_taskks(session)
+    #         # tasks = await_tasks
             
-            # for task in tasks:
-                # crondict = json.loads(task.crontab)
-                # celery_app.add_periodic_task(
-                #     schedule=crontab(**crondict),
-                #     name=task.task_name,
-                #     sig=celery_app.signature(task.task_sig),
-                #     args=(arg for arg in task.task_args)
-                # )
-                # celery_app.conf.beat_schedule[task.task_name] = {
-                #     "task": task.task_name,
-                #     "schedule": crontab(**crondict),
-                #     "args": (arg for arg in task.task_args),
-                # }
+    #         # for task in tasks:
+    #             # crondict = json.loads(task.crontab)
+    #             # celery_app.add_periodic_task(
+    #             #     schedule=crontab(**crondict),
+    #             #     name=task.task_name,
+    #             #     sig=celery_app.signature(task.task_sig),
+    #             #     args=(arg for arg in task.task_args)
+    #             # )
+    #             # celery_app.conf.beat_schedule[task.task_name] = {
+    #             #     "task": task.task_name,
+    #             #     "schedule": crontab(**crondict),
+    #             #     "args": (arg for arg in task.task_args),
+    #             # }
             
-        LOGGER.debug("Periodic tasks configured successful")
-    except Exception as e:
-        LOGGER.error(f"Error setting the periodic tasks")
+    #     LOGGER.debug("Periodic tasks configured successful")
+    # except Exception as e:
+    #     LOGGER.error(f"Error setting the periodic tasks")
         
         
