@@ -176,11 +176,11 @@ class UserServices:
     # #####  WORKING ENDOINT
     async def sui_wallet_endpoint(self, url: str, body: Optional[dict]):
         headers = {
-            "accept": "application/json",
+            "accept": "*/*",
             "Content-Type": "application/json"
         }
         
-        
+        LOGGER.debug(body)
             
         response = requests.post(url, headers=headers, json=body)
         LOGGER.debug(response.json())
@@ -609,6 +609,7 @@ class UserServices:
         user.wallet.earnings += Decimal(percentage * amount)
         user.wallet.availableReferralEarning += Decimal(percentage * amount)
         user.wallet.totalReferralEarnings += Decimal(percentage * amount)
+        user.wallet.totalReferralBonus += Decimal(percentage * amount)
         
         LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         
@@ -619,7 +620,7 @@ class UserServices:
         session.add(ref_activity)
         if level < 6:
             return self.add_referrer_earning(referral, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
-
+        return None
     # ##### TODO:END
 
 
