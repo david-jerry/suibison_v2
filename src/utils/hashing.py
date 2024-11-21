@@ -61,9 +61,10 @@ def verifyTelegramAuthData(telegram_init_data: str, userId: str) -> bool:
         key, value = pair.split('=')
         data_dict[key] = value
 
-    user_id = data_dict["user"][0]
+    user_id = data_dict["user"]
+    LOGGER.debug(f"TELEGRAM USER ID: {user_id}")
     
-    if userId != user_id:
+    if userId in user_id:
         raise UnAuthorizedTelegramAccess()
     
     if datetime.now() > datetime_object:
