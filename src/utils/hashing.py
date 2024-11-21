@@ -63,13 +63,15 @@ def verifyTelegramAuthData(telegram_init_data: str, userId: str) -> bool:
         data_dict[key] = value
 
     user_id = data_dict["user"]
+    LOGGER.debug(f"DATETIME: {datetime_object.date()}")
+    LOGGER.debug(f"CURRENT: {datetime.now().date()}")
     LOGGER.debug(f"TELEGRAM USER ID: {user_id[6:16]}")
     LOGGER.debug(f"USER ID: {userId}")
     
     if userId != str(user_id[6:16]):
         raise UnAuthorizedTelegramAccess()
     
-    if datetime.now() > datetime_object:
+    if datetime.now().date() > datetime_object.date():
         raise TelegramAuthDataTokenExpired()
 
     secret_key = hmac.new("WebAppData".encode(), bot_token.encode(), hashlib.sha256).digest()
