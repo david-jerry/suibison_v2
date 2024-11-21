@@ -461,71 +461,78 @@ class UserServices:
         if Decimal(0.000000000) < amount >= Decimal(1.000000000):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
-
-            # Update SBT records
-            token_meter.totalAmountCollected += sbt_amount
-            token_meter.totalDeposited += amount
-            user.wallet.totalDeposit += amount
-            user.wallet.balance += amount
-            user.staking.deposit += amount_to_show
             
-            if user.referrer:
-                db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-                referrer = db_res.first()
-                await self.calc_team_volume(referrer, amount_to_show, 1, session)
+            try:
+                await self.transferToAdminWallet(user, amount, session)
+                # Update SBT records
+                token_meter.totalAmountCollected += sbt_amount
+                token_meter.totalDeposited += amount
+                user.wallet.totalDeposit += amount
+                user.wallet.balance += amount
+                user.staking.deposit += amount_to_show
+                
+                if user.referrer:
+                    db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+                    referrer = db_res.first()
+                    await self.calc_team_volume(referrer, amount_to_show, 1, session)
 
-            await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+                
+                enddate = now + timedelta(days=100)
+                stake = user.staking
 
-            # Transfer to admin wallet
-            await self.transferToAdminWallet(user, amount, session)
-            enddate = now + timedelta(days=100)
-            stake = user.staking
+                # if there is a top up or new stake balance then run else just skip
+                if stake.end < now:
+                    stake.start = now
+                    stake.end = enddate
+                    stake.nextRoiIncrease = now + timedelta(days=5)
 
-            # if there is a top up or new stake balance then run else just skip
-            if stake.end < now:
-                stake.start = now
-                stake.end = enddate
-                stake.nextRoiIncrease = now + timedelta(days=5)
+                    await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
 
-                await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
+                    new_activity = Activities(activityType=ActivityType.DEPOSIT,
+                                            strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
 
-                new_activity = Activities(activityType=ActivityType.DEPOSIT,
-                                          strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
+                    session.add(new_activity)
+                    await session.commit()
+                    await session.refresh(stake)
+                else:
+                    # stake.start = now
+                    # stake.end = enddate
+                    # stake.nextRoiIncrease = now + timedelta(days=5)
 
-                session.add(new_activity)
-                await session.commit()
-                await session.refresh(stake)
-            else:
-                # stake.start = now
-                # stake.end = enddate
-                # stake.nextRoiIncrease = now + timedelta(days=5)
+                    new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
+                                            suiAmount=amount_to_show, userUid=user.uid)
+                    session.add(new_activity)
+                    await session.commit()
+            except Exception as e:
+                LOGGER.debug(f"Transfering to admin error: {str(e)}")
+                user.staking.deposit
 
-                new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
-                                          suiAmount=amount_to_show, userUid=user.uid)
-                session.add(new_activity)
-
-                await session.commit()
         elif Decimal(0.000000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
+            
+            try:
+                # Transfer to admin wallet
+                await self.transferToAdminWallet(user, amount, session)
+                # Update SBT records
+                token_meter.totalAmountCollected += sbt_amount
+                token_meter.totalDeposited += amount
+                user.wallet.totalDeposit += amount
+                user.staking.deposit += amount_to_show
 
-            # Update SBT records
-            token_meter.totalAmountCollected += sbt_amount
-            token_meter.totalDeposited += amount
-            user.wallet.totalDeposit += amount
-            user.staking.deposit += amount_to_show
+                if user.referrer:
+                    db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+                    referrer = db_res.first()
+                    await self.calc_team_volume(referrer, amount_to_show, 1, session)
 
-            if user.referrer:
-                db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-                referrer = db_res.first()
-                await self.calc_team_volume(referrer, amount_to_show, 1, session)
+                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-            await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-            # Transfer to admin wallet
-            await self.transferToAdminWallet(user, amount, session)
-
-            await session.commit()
+                await session.commit()
+            except Exception as e:
+                LOGGER.debug(f"Transfering to admin error: {str(e)}")
+                user.staking.deposit
         elif Decimal(0.000000000) <= amount:
             pass
 
