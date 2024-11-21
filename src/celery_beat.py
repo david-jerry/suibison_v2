@@ -99,7 +99,7 @@ class TemplateScheduleSQLRepository:
         await session.commit()
         
         celery_app.add_periodic_task(    
-            sig=celery_app.signature(name=periodic_task.uid),
+            sig=celery_app.signature(name=periodic_task.uid, varies=True),
             name=task_name,
             schedule=cron_value,
             args=periodic_task.task_args,
