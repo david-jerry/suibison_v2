@@ -141,16 +141,16 @@ class AdminServices:
 
     async def getAllTransactions(self, date: date, session: AsyncSession):
         if date is not None:
-            transactions = await session(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).where(Activities.created.date() >= date).order_by(Activities.created))
+            transactions = await session.exec(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).where(Activities.created.date() >= date).order_by(Activities.created))
             return transactions.all()
-        transactions = await session(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).order_by(Activities.created))
+        transactions = await session.exec(select(Activities).where(Activities.activityType == ActivityType.DEPOSIT, Activities.activityType == ActivityType.WITHDRAWAL).order_by(Activities.created))
         return transactions.all()
 
-    async def getAllActivities(self, date: date, session: AsyncSession):
+    async def getAllActivities(self, date: Optional[date], session: AsyncSession):
         if date is not None:
-            allActivities = await session(select(Activities).where(Activities.created.date() >= date).order_by(Activities.created))
+            allActivities = await session.exec(select(Activities).where(Activities.created >= now).order_by(Activities.created))
             return allActivities.all()
-        allActivities = await session(select(Activities).order_by(Activities.created))
+        allActivities = await session.exec(select(Activities).order_by(Activities.created))
         return allActivities.all()
 
     async def getAllUsers(self, date: date, session: AsyncSession):
