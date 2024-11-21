@@ -444,10 +444,11 @@ class UserServices:
     async def calc_team_volume(self, referrer: User, amount: Decimal, level: int, session: AsyncSession):
         if level < 6:
             referrer.totalTeamVolume += amount
-            level_referrer_db = await session.exec(select(User).where(User.userId == referrer.referrer.userId))
-            level_referrer = level_referrer_db.first()
-            if level_referrer is not None:
-                self.calc_team_volume(level_referrer, amount, level + 1, session)
+            if referrer.referrer is not None:
+                level_referrer_db = await session.exec(select(User).where(User.userId == referrer.referrer.userId))
+                level_referrer = level_referrer_db.first()
+                if level_referrer is not None:
+                    self.calc_team_volume(level_referrer, amount, level + 1, session)
         return None
            
     async def handle_stake_logic(self, amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
