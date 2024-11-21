@@ -236,6 +236,9 @@ class UserServices:
             db_result = await session.exec(select(User).where(User.userId == referrer))
             user = db_result.first()
             
+            if user is None:
+                return None
+            
             ###### check for speed boost
             # fetch referrals for the referrer if available
             ref_db_result = await session.exec(select(UserReferral).where(UserReferral.userId == referrer))
@@ -244,7 +247,7 @@ class UserServices:
             ref_deposit = Decimal(0.000000000)
             
             # if the referrer is not none and has atleast one referral
-            if user is not None and user.totalReferrals > Decimal(0):                
+            if user.totalReferrals > Decimal(0):                
                 for ref in referrals:
                     refd_db = await session.exec(select(User).where(User.userId == ref.theirUserId))
                     refd = refd_db.first()
@@ -270,16 +273,15 @@ class UserServices:
                 
             
             # Save the referral level down to the 5th level in redis for improved performance
-            if user is not None:
-                user.wallet.earnings += percentage * amount
-                user.totalTeamVolume += amount
-                db_res = await session.exec(select(UserReferral).where(UserReferral.userUid == referralUid).where(UserReferral.userId == referrer))
-                the_referred_user = db_res.first()
-                the_referred_user.reward = percentage * amount
-                ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
-                session.add(ref_activity)
-                if level < 6:
-                    return self.add_referrer_earning(referralUid, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
+            user.wallet.earnings += percentage * amount
+            user.totalTeamVolume += amount
+            db_res = await session.exec(select(UserReferral).where(UserReferral.userUid == referralUid).where(UserReferral.userId == referrer))
+            the_referred_user = db_res.first()
+            the_referred_user.reward = percentage * amount
+            ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
+            session.add(ref_activity)
+            if level < 6:
+                return self.add_referrer_earning(referralUid, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
         return None
                 
     async def create_wallet(self, user: User, session: AsyncSession):
