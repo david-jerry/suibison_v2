@@ -55,14 +55,14 @@ async def run_post_celery_config():
             await_tasks = await celery_beat.get_periodic_taskks(session)
             tasks = await_tasks
             
-            for task in tasks:
-                crondict = json.loads(task.crontab)
-                celery_app.add_periodic_task(
-                    schedule=crontab(**crondict),
-                    name=task.task_name,
-                    sig=celery_app.signature(task.task_sig),
-                    args=(arg for arg in task.task_args)
-                )
+            # for task in tasks:
+                # crondict = json.loads(task.crontab)
+                # celery_app.add_periodic_task(
+                #     schedule=crontab(**crondict),
+                #     name=task.task_name,
+                #     sig=celery_app.signature(task.task_sig),
+                #     args=(arg for arg in task.task_args)
+                # )
                 # celery_app.conf.beat_schedule[task.task_name] = {
                 #     "task": task.task_name,
                 #     "schedule": crontab(**crondict),

@@ -5,7 +5,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlmodel import select, func
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import Any, List, Literal, Optional
-
+from src.celery_tasks import celery_app
 from src.apps.accounts.models import CeleryBeat, User
 from src.errors import IncorrectScheduleDuration
 
@@ -96,8 +96,17 @@ class TemplateScheduleSQLRepository:
             crontab=json.dumps(cron_dict),
             schedule_type=schedule_type,
         )
+        
         session.add(periodic_task)
         await session.commit()
+        
+        celery_app.add_periodic_task(    
+            sig=celery_app.signature(periodic_task.uid),
+            name=task_name,
+            schedule=cron_value,
+            args=periodic_task.task_args,
+            kwargs=periodic_task.task_kwargs
+        )
         await session.refresh(periodic_task)  # Optional: refresh to get generated values like uid
         return None
 
