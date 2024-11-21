@@ -44,9 +44,12 @@ class User(SQLModel, table=True):
     )
 
     userId: str = Field(max_length=12, nullable=False, description="Telegram user ID", index=True)
-    firstName: Optional[str] = Field(max_length=255, nullable=True, default=None, description="Telegram user saved First Name")
-    lastName: Optional[str] = Field(max_length=255, nullable=True, default=None, description="Telegram user saved Last Name")
-    phoneNumber: Optional[str] = Field(max_length=14, nullable=True, default=None, description="Telegram user saved Phone Nmber")
+    firstName: Optional[str] = Field(max_length=255, nullable=True, default=None,
+                                     description="Telegram user saved First Name")
+    lastName: Optional[str] = Field(max_length=255, nullable=True, default=None,
+                                    description="Telegram user saved Last Name")
+    phoneNumber: Optional[str] = Field(max_length=14, nullable=True, default=None,
+                                       description="Telegram user saved Phone Nmber")
     dob: Optional[date] = Field(
         default_factory=None,
         sa_column=Column(pg.DATE, nullable=True, default=None),
@@ -57,7 +60,8 @@ class User(SQLModel, table=True):
 
     # Permissions
     isBlocked: bool = Field(default=False, description="When a user violates the rules of the project they get banned")
-    usedSpeedBoost: bool = Field(default=False, nullable=True, description="If a user has enabled their speed boost then they would no longer need it")
+    usedSpeedBoost: bool = Field(default=False, nullable=True,
+                                 description="If a user has enabled their speed boost then they would no longer need it")
     isAdmin: bool = Field(default=False)
     isSuperuser: bool = Field(default=False, description="A superuser permission")
     hasMadeFirstDeposit: bool = Field(
@@ -95,12 +99,20 @@ class User(SQLModel, table=True):
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
     )
-
+    
+    # failed transactions
+    pendingTransactions: List["PendingTransactions"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
+    )
 
     joined: datetime = Field(default_factory=datetime.utcnow, nullable=False, description="Record creation timestamp")
-    lastRankEarningAddedAt: datetime = Field(default_factory=datetime.utcnow, nullable=False, description="Last earning calculation timestamp")
+    lastRankEarningAddedAt: datetime = Field(default_factory=datetime.utcnow,
+                                             nullable=False, description="Last earning calculation timestamp")
     updatedAt: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(
         pg.TIMESTAMP, nullable=False, onupdate=datetime.utcnow), description="Record last update timestamp")
+    
+    
 
     def __repr__(self) -> str:
         return f"<User {self.userId}>"
@@ -114,7 +126,7 @@ class UserReferral(SQLModel, table=True):
         default_factory=uuid.uuid4,
         sa_column=Column(pg.UUID, primary_key=True, unique=True, nullable=False)
     )
-    
+
     level: int = Field(default=1, nullable=True)
 
     theirUserId: str = Field(nullable=True)
@@ -174,6 +186,24 @@ class UserWallet(SQLModel, table=True):
         return f"<Wallets {self.address}>"
 
 
+class PendingTransactions(SQLModel, table=True):
+    __tablename__ = "peending_transactions"
+
+    uid: uuid.UUID = Field(
+        sa_column=Column(
+            pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
+        )
+    )
+    
+    amount: Decimal = Field(decimal_places=9, default=0.00)
+    
+    # Foreign Key to User
+    userUid: Optional[uuid.UUID] = Field(default=None, nullable=True, foreign_key="users.uid")
+    user: Optional[User] = Relationship(back_populates="pendingTransactions")
+    commpleted: bool = Field(default=False)
+
+
+
 class UserStaking(SQLModel, table=True):
     """
     A user can deposit and activate only one intance of a staking run with a minimuum of 3sui token
@@ -205,6 +235,7 @@ class UserStaking(SQLModel, table=True):
     nextRoiIncrease: Optional[datetime] = Field(
         sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
     )
+
     def __repr__(self) -> str:
         return f"<Stakes {self.user}>"
 
@@ -292,7 +323,7 @@ class TokenMeter(SQLModel, table=True):
     totalWithdrawn: Decimal = Field(decimal_places=9, default=Decimal(0))
     totalSentToGMP: Decimal = Field(decimal_places=9, default=Decimal(0))
     totalDistributedByGMP: Decimal = Field(decimal_places=9, default=Decimal(0))
-    
+
     def __repr__(self) -> str:
         return f"<TokenMeter {self.tokenAddress}>"
 
@@ -320,5 +351,3 @@ class Activities(SQLModel, table=True):
         default_factory=datetime.utcnow,
         sa_column=Column(pg.TIMESTAMP, default=datetime.utcnow),
     )
-
-

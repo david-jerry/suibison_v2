@@ -6,7 +6,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
-from src.apps.accounts.models import User, UserReferral, UserStaking, UserWallet, MatrixPool, MatrixPoolUsers, TokenMeter, Activities
+from src.apps.accounts.models import User, UserReferral, UserStaking, UserWallet, MatrixPool, MatrixPoolUsers, TokenMeter, Activities, PendingTransactions
 
 from alembic import context
 

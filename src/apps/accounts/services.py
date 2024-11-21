@@ -23,7 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.apps.accounts.dependencies import user_exists_check
 from src.apps.accounts.enum import ActivityType
-from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
+from src.apps.accounts.models import Activities, MatrixPool, MatrixPoolUsers, PendingTransactions, TokenMeter, User, UserReferral, UserStaking, UserWallet
 from src.apps.accounts.schemas import AdminLogin, AllStatisticsRead, MatrixUserCreateUpdate, TokenMeterCreate, TokenMeterUpdate, UserCreateOrLoginSchema, UserLoginSchema, UserUpdateSchema, Wallet
 from src.celery_beat import TemplateScheduleSQLRepository
 from src.utils.calculations import get_rank
@@ -456,14 +456,22 @@ class UserServices:
         LOGGER.debug(f"SECOND CHECK PASS? : {Decimal(0.000000000) < amount < Decimal(0.9)}")
         LOGGER.debug(f"THIRD CHECK PASS? : {False}")
         
+        pt_res = await session.exec(select(PendingTransactions).where(PendingTransactions.amount == amount).where(PendingTransactions.userUid == user.uid).where(PendingTransactions.status == False))
+        pendingTransaction = pt_res.first()
+        
         
         """Core logic for handling the staking process."""
         if Decimal(0.000000000) < amount >= Decimal(1.000000000):
-            amount_to_show = amount - (amount * Decimal(0.1))
-            sbt_amount = amount * Decimal(0.1)
+            amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
+            sbt_amount = Decimal(amount * Decimal(0.1))
             
             try:
                 await self.transferToAdminWallet(user, amount, session)
+                
+                if pendingTransaction is not None:
+                    user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
+                    await session.commit()
+
                 # Update SBT records
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
@@ -506,7 +514,14 @@ class UserServices:
                     await session.commit()
             except Exception as e:
                 LOGGER.debug(f"Transfering to admin error: {str(e)}")
-                user.staking.deposit
+                if pendingTransaction is not None:
+                    await session.delete(pendingTransaction)
+                    
+                nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
+                session.add(nw_pt)
+                await session.commit()
+                user.staking.deposit -= pendingTransaction.amount
+                user.staking.deposit += amount
 
         elif Decimal(0.000000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
@@ -515,6 +530,10 @@ class UserServices:
             try:
                 # Transfer to admin wallet
                 await self.transferToAdminWallet(user, amount, session)
+                if pendingTransaction is not None:
+                    user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
+                    await session.commit()
+
                 # Update SBT records
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
@@ -527,12 +546,17 @@ class UserServices:
                     await self.calc_team_volume(referrer, amount_to_show, 1, session)
 
                 await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
-
-
                 await session.commit()
             except Exception as e:
                 LOGGER.debug(f"Transfering to admin error: {str(e)}")
-                user.staking.deposit
+                if pendingTransaction is not None:
+                    await session.delete(pendingTransaction)
+                    
+                nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
+                session.add(nw_pt)
+                await session.commit()
+                user.staking.deposit -= pendingTransaction.amount
+                user.staking.deposit += amount
         elif Decimal(0.000000000) <= amount:
             pass
 
