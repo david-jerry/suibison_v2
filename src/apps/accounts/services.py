@@ -695,6 +695,7 @@ class UserServices:
                 "recipient": token_meter.tokenAddress
             }
             res = await self.sui_wallet_endpoint(url, body)
+            LOGGER.debug(f"TRANSACTION STATUS: {res["transaction"]["result"]["effects"]["status"]["status"]}")
             return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -716,6 +717,7 @@ class UserServices:
                 "recipient": wallet
             }
             res = await self.sui_wallet_endpoint(url, body)
+            LOGGER.debug(f"TRANSACTION STATUS: {res["transaction"]["result"]["effects"]["status"]["status"]}")
             return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
