@@ -30,6 +30,7 @@ celery_app.conf.broker_connection_retry_on_startup = True
 
 # Autodiscover tasks from all installed apps (each app should have a 'tasks.py' file)
 celery_app.autodiscover_tasks(packages=['src.apps.accounts'], related_name='tasks')
+celery_app.control.purge()
 celery_app.conf.beat_schedule = {
     'fetch-every-60-seconds': {
         'task': 'fetch_sui_usd_price_hourly',

@@ -598,10 +598,13 @@ class UserServices:
             LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO")
             return None
 
+        LOGGER.debug("passed user check")
         # check for speed boost
         # fetch referrals for the referrer if available
         ref_db_result = await session.exec(select(UserReferral).where(UserReferral.userId == referrer))
         referrals = ref_db_result.all()
+        
+        LOGGER.debug("Fetched all referrals")
 
         ref_deposit = Decimal(0.000000000)
         
