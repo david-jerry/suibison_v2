@@ -62,7 +62,7 @@ async def fetch_sui_balance():
         users = user_db.all()
         
         for user in users:
-            user_services.stake_sui(user, session)
+            await user_services.stake_sui(user, session)
 
 async def calculate_daily_tasks():
     now = datetime.now()
