@@ -106,6 +106,7 @@ class SUIRequests:
         coins: List[Coin] = []
         if response.status_code == 200:
             result = response.json()
+            LOGGER.debug(f"COINIDS: {result}")
             if 'error' in result:
                 raise Exception(f"Error: {result['error']}")
             for coin in result['result']["data"]:
@@ -137,6 +138,7 @@ class SUIRequests:
         
         if response.status_code == 200:
             result = response.json()
+            LOGGER.debug(f"PAYSUI RESPONSE: {result}")
             if 'error' in result:
                 raise Exception(f"PAYSUI-Error: {result['error']}")
             LOGGER.debug(pprint.pprint(result, indent=4))
@@ -167,6 +169,7 @@ class SUIRequests:
         
         if response.status_code == 200:
             result = response.json()
+            LOGGER.debug(f"PAYALLSUI RESPONSE: {result}")
             if 'error' in result:
                 raise Exception(f"PAYALLSUI- Error: {result['error']}")
             res = result["result"]
