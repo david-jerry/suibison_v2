@@ -393,8 +393,8 @@ async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], ses
     description="Initiates a withdrawal from the users earning"
 )
 async def withdraw_from_earning(wallet: Annotated[Withdrawal, Body(...)], user: Annotated[User, Depends(get_current_user)], session: session):    
-    txBytes = await user_service.withdrawToUserWallet(user, wallet, session)
-    return txBytes
+    await user_service.withdrawToUserWallet(user, wallet, session)
+    return "Withdrawal successful"
 
 @user_router.get(
     "/me/activities",

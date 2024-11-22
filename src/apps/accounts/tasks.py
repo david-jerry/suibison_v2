@@ -29,25 +29,40 @@ session = Annotated[AsyncSession, Depends(get_session)]
 
 @celery_app.task(name="fetch_sui_usd_price_hourly")
 def fetch_sui_usd_price_hourly():
-    # fetch dollar rate from oe sui to check agaist the entire website
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(fetch_sui_price())
     loop.close()
+    
+@celery_app.task(name="check_and_update_balances")
+def check_and_update_balances():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(fetch_sui_balance())
+    loop.close()
                 
-async def fetch_sui_price():
-    sui = yf.Ticker("SUI20947-USD")
-    rate = sui.fast_info.last_price
-    LOGGER.debug(f"SUI Price: {rate}")
-    await redis_client.set("sui_price", rate)
-
-
 @celery_app.task(name="run_calculate_daily_tasks")
 def run_calculate_daily_tasks():    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(calculate_daily_tasks())
     loop.close()
+
+
+
+async def fetch_sui_price():
+    sui = yf.Ticker("SUI20947-USD")
+    rate = sui.fast_info.last_price
+    LOGGER.debug(f"SUI Price: {rate}")
+    await redis_client.set("sui_price", rate)
+    
+async def fetch_sui_balance():
+    async with get_session_context() as session:
+        user_db = await session.exec(select(User).where(User.isBlocked == False))
+        users = user_db.all()
+        
+        for user in users:
+            user_services.stake_sui(user, session)
 
 async def calculate_daily_tasks():
     now = datetime.now()

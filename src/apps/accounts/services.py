@@ -472,7 +472,7 @@ class UserServices:
         
         
         """Core logic for handling the staking process."""
-        if Decimal(0.0050000000) < amount:
+        if Decimal(0.000000000) < amount:
             
             amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
             sbt_amount = Decimal(amount * Decimal(0.1))
@@ -480,17 +480,11 @@ class UserServices:
             try:
                 status = await self.transferToAdminWallet(user, amount, session)
                 if status == "failure":
-                    raise HTTPException(status_code=400, detail=status)
+                    raise HTTPException(status_code=400, detail=f"There was a transfer failure with status: {status}")
                 
                 if pendingTransaction is not None:
                     await session.delete(pendingTransaction)
                     await session.commit()
-
-                # Update SBT records
-                if not user.hasMadeFirstDeposit:
-                    user.staking.start = now
-                    await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
-                    user.hasMadeFirstDeposit = True
                     
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
@@ -498,11 +492,6 @@ class UserServices:
                 user.wallet.balance += amount
                 user.staking.deposit += amount_to_show
                 
-                if user.referrer:
-                    LOGGER.debug(f"USER HHAS REF: {True}")
-                    db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-                    referrer = db_res.first()
-                    await self.calc_team_volume(referrer, amount_to_show, 1, session)
 
                 await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
                 
@@ -566,8 +555,28 @@ class UserServices:
             raise TokenMeterDoesNotExists()
 
         # perform stake calculations
-        await self.handle_stake_logic(amount, token_meter, user, session)
+        try:
+            await self.handle_stake_logic(amount, token_meter, user, session)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Staking Failed")
         
+        if not user.hasMadeFirstDeposit:
+            await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
+            user.hasMadeFirstDeposit = True
+        
+        if user.referrer:
+            LOGGER.debug(f"USER HHAS REF: {True}")
+            amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
+            db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+            referrer = db_res.first()
+            await self.calc_team_volume(referrer, amount_to_show, 1, session)
+            
+        # if user.referrer:
+        #     LOGGER.debug(f"USER HHAS REF: {True}")
+        #     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+        #     referrer = db_res.first()
+        #     await self.calc_team_volume(referrer, amount_to_show, 1, session)
+
 
         await session.commit()
         await session.refresh(user)
