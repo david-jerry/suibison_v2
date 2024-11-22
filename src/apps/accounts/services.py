@@ -614,11 +614,6 @@ class UserServices:
         rf_db = await session.exec(select(UserReferral).where(UserReferral.theirUserId == referral.userId).where(UserReferral.userId == referrer))
         referral_to_update = rf_db.first()
         
-        LOGGER.debug(f"REFERRAL TO UPDATE: {referral_to_update.user.firstName}")
-        if referral_to_update is not None:
-            referral_to_update.stake += amount
-            referral_to_update.reward += percentage * amount
-        referring_user.totalReferralsStakes += amount
         
         # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
@@ -631,6 +626,11 @@ class UserServices:
         elif level == 5:
             percentage = Decimal(0.01)
 
+        LOGGER.debug(f"REFERRAL TO UPDATE: {referral_to_update.user.firstName}")
+        if referral_to_update is not None:
+            referral_to_update.stake += amount
+            referral_to_update.reward += percentage * amount
+        referring_user.totalReferralsStakes += amount
         # Save the referral level down to the 5th level in redis for improved performance
         referring_user.wallet.earnings += percentage * amount
         referring_user.wallet.availableReferralEarning += percentage * amount
