@@ -205,7 +205,7 @@ class SUIRequests:
             "secret": privateKey,
             "txBytes": bcsTxBytes,
         }
-        response = await asyncio.to_thread(requests.post, "https://suiwallet.sui-bison.live/se-transactions", json=payload)
+        response = await asyncio.to_thread(requests.post, "https://suiwallet.sui-bison.live/wallet/se-transactions", json=payload)
         LOGGER.debug(response)
         
         if response.status_code == 200:
