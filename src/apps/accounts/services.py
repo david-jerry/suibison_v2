@@ -309,7 +309,7 @@ class UserServices:
         if user.isBlocked:
             raise UserBlocked()
 
-        # update the users rank record immediately they open the webapp and the weeks match up
+        # TODO: update the users rank record immediately they open the webapp and the weeks match up
         await self.calculate_rank_earning(user, session)
 
         # # Process active stake balances and earnings
@@ -668,7 +668,7 @@ class UserServices:
         db_result = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid).where(UserReferral.level == 1))
         referrals = db_result.all()
         rankErning, rank = await get_rank(user.totalTeamVolume, user.wallet.totalDeposit, referrals)
-
+        
         if user.rank != rank:
             user.rank = rank
 

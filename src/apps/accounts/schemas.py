@@ -325,8 +325,8 @@ class StakingRead(StakingBaseSchema):
 
 class TokenMeterCreate(BaseModel):
     tokenAddress: str
-    tokenPrivateKey: Optional[str] = None
-    tokenPhrase: Optional[str] = None
+    # tokenPrivateKey: Optional[str] = None
+    # tokenPhrase: Optional[str] = None
     totalCap: Decimal = Decimal(0)
     tokenPrice: Optional[Decimal] = Decimal(0.02)
     
