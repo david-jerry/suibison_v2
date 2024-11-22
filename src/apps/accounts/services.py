@@ -631,6 +631,8 @@ class UserServices:
         LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         
         if referral.referrer is not None:
+            referral.referrer.stake = amount
+            referral.totalReferralsStakes += amount
             referral.referrer.reward = Decimal(percentage * amount)
             
         # ####### END ######### #

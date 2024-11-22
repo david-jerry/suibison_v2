@@ -38,15 +38,17 @@ celery_app.control.purge()
 celery_app.conf.beat_schedule = {
     'fetch-every-60-seconds': {
         'task': 'fetch_sui_usd_price_hourly',
-        'schedule': 120.0,
+        'schedule': 60 * 5,
     },
+    # 24 hours
     'run_calculate_daily_tasks': {
         'task': 'run_calculate_daily_tasks',
-        'schedule': crontab(minute="0", hour="0")
+        'schedule': 60 * 60 * 24
     },
+    # 15 minutes
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': 120.0
+        'schedule': 60 * 15
     }
 }
 

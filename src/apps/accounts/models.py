@@ -73,6 +73,7 @@ class User(SQLModel, table=True):
     totalTeamVolume: Decimal = Field(default=Decimal(0), decimal_places=9)
     # totalReferrals will also be stored in the schema instead of in the database
     totalReferrals: Decimal = Field(default=Decimal(0), decimal_places=9)
+    totalReferralsStakes: Decimal = Field(default=Decimal(0), decimal_places=9, nullable=True)
     # totalNetwork likewise
     totalNetwork: int = Field(default=Decimal(0), sa_column=Column(pg.BIGINT, nullable=False))
 
@@ -133,6 +134,7 @@ class UserReferral(SQLModel, table=True):
     userId: Optional[str] = Field(default=None, nullable=True)
     name: Optional[str] = Field(default=None, nullable=True, max_length=255)
     reward: Decimal = Field(default=Decimal(0.00), decimal_places=9, nullable=True)
+    stake: Decimal = Field(default=Decimal(0.00), decimal_places=9, nullable=True)
     userUid: Optional[uuid.UUID] = Field(default=None, foreign_key="users.uid")
     user: Optional["User"] = Relationship(back_populates="referrer")
     created: datetime = Field(default_factory=datetime.utcnow, nullable=True, description="Record creation timestamp")

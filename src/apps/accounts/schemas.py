@@ -171,6 +171,7 @@ class UserRead(UserBaseSchema):
     rank: Optional[str]
     totalTeamVolume: Decimal = Decimal(0)
     totalReferrals: Decimal = Decimal(0)
+    totalReferralsStakes: Decimal = Decimal(0)
     totalNetwork: Decimal = Decimal(0)
 
     age: Optional[int] = 0
@@ -211,6 +212,7 @@ class UserReferralRead(BaseModel):
     uid: uuid.UUID
     level: int
     name: Optional[str]
+    stake: Optional[Decimal] = Decimal(0)
     reward: Optional[Decimal] = Decimal(0.00)
     theirUserId: str
     userUid: uuid.UUID
