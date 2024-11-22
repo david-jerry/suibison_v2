@@ -459,7 +459,7 @@ class UserServices:
         
         
         """Core logic for handling the staking process."""
-        if Decimal(0.000000000) < amount >= Decimal(1.000000000):
+        if Decimal(0.0040000000) < amount >= Decimal(1.000000000):
             amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
             sbt_amount = Decimal(amount * Decimal(0.1))
             
@@ -526,7 +526,7 @@ class UserServices:
                 session.add(nw_pt)
                 await session.commit()
                 user.staking.deposit += amount
-        elif Decimal(0.000000000) < amount < Decimal(0.9):
+        elif Decimal(0.0040000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
             
@@ -567,7 +567,7 @@ class UserServices:
                 session.add(nw_pt)
                 user.staking.deposit += amount
                 await session.commit()
-        elif Decimal(0.000000000) <= amount:
+        elif Decimal(0.0040000000) <= amount:
             pass
 
     async def stake_sui(self, user: User, session: AsyncSession):
@@ -596,7 +596,7 @@ class UserServices:
         await self.handle_stake_logic(amount, token_meter, user, session)
         
         # Handle first-time staking
-        if not user.hasMadeFirstDeposit and amount > Decimal(0.000000000):
+        if not user.hasMadeFirstDeposit and amount > Decimal(0.0040000000):
             user.staking.start = now
             await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
             user.hasMadeFirstDeposit = True
@@ -697,6 +697,10 @@ class UserServices:
             res = await self.sui_wallet_endpoint(url, body)
             status = res["transaction"]["result"]["effects"]["status"]["status"]
             LOGGER.debug(f"TRANSACTION STATUS: {status}")
+            if status == "failure":
+                LOGGER.debug(f"RETRYING REANSFER")
+                t_amount -= 100
+                self.transferFromAdminWallet(user, Decimal(t_amount / 10**9), session)
             return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -719,6 +723,11 @@ class UserServices:
             }
             res = await self.sui_wallet_endpoint(url, body)
             status = res["transaction"]["result"]["effects"]["status"]["status"]
+            if status == "failure":
+                LOGGER.debug(f"RETRYING WITHDRAWAL")
+                t_amount -= 100
+                self.transferFromAdminWallet(wallet, Decimal(t_amount / 10**9), user, session)
+                
             LOGGER.debug(f"TRANSACTION STATUS: {status}")
             return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
         except Exception as e:
