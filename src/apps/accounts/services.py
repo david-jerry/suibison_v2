@@ -206,11 +206,11 @@ class UserServices:
                 userUid=new_user.uid,
                 userId=referrer.userId,
             )
-            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
             session.add(new_referral)
             session.add(Activities(activityType=ActivityType.REFERRAL,
                         strDetail=f"New Level {level} referral added", userUid=referrer.uid))
-            # await session.commit()
+            await session.commit()
+            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
             if referring_user.referrer is not None:
                 db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
                 referrers_referrer = db_result.first()
@@ -226,6 +226,8 @@ class UserServices:
             raise ReferrerNotFound()
 
         fast_boost_time = referring_user.joined + timedelta(hours=24)
+        await self.create_referral_level(new_user, referring_user, 1, session)
+
         db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
         referrals = db_referrals.all()
         
@@ -243,7 +245,6 @@ class UserServices:
             referring_user.wallet.totalFastBonus += Decimal(1.00)
             referring_user.staking.deposit += Decimal(1.00)
 
-        await self.create_referral_level(new_user, referring_user, 1, session)
         return None
 
     async def create_wallet(self, user: User, session: AsyncSession):
@@ -591,6 +592,8 @@ class UserServices:
     # ###### TODO: CHECK FOR REASONS THE REFERRAL BONUS IS NOT WORKING
 
     async def add_referrer_earning(self, referral: User, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
+        LOGGER.debug("eexecuting referral earning calculations")
+        
         db_result = await session.exec(select(User).where(User.userId == referrer))
         user = db_result.first()
 
