@@ -284,7 +284,7 @@ async def delete_a_user(userId: str, session: session):
     user = db_user.first()
     db_pool_users = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.userId == userId))
     all_pool = db_pool_users.all()
-    ref_db = await session.exec(select(User).where(User.userid == user.referrer.userId))
+    ref_db = await session.exec(select(User).where(User.userId == user.referrer.userId))
     referrer = ref_db.first()
     
     if referrer is not None:
