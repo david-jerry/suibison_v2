@@ -524,10 +524,10 @@ class UserServices:
                     await session.delete(pendingTransaction)
                     user.staking.deposit -= pendingTransaction.amount
                     
+                user.staking.deposit += amount
                 nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
                 session.add(nw_pt)
                 await session.commit()
-                user.staking.deposit += amount
         elif Decimal(0.0040000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
             sbt_amount = amount * Decimal(0.1)
@@ -568,9 +568,9 @@ class UserServices:
                     await session.delete(pendingTransaction)
                     user.staking.deposit -= pendingTransaction.amount
                     
+                user.staking.deposit += amount
                 nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
                 session.add(nw_pt)
-                user.staking.deposit += amount
                 await session.commit()
         elif Decimal(0.0040000000) <= amount:
             pass
