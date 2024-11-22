@@ -789,12 +789,10 @@ class UserServices:
         session.add(new_activity)
         # Top up the meter balance with the users amount and update the amount
         # invested by the user into the token meter
-        token_meter.totalAmountCollected += token_meter_amount
+        # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.totalTokenPurchased += token_meter_amount
         user.wallet.availableReferralEarning += 0.00
         user.wallet.totalWithdrawn += withdawable_amount
-
-        # redeposit 20% from the earnings amount into the user staking deposit
         user.wallet.staking.deposit += redepositable_amount
 
         new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
@@ -812,6 +810,10 @@ class UserServices:
         if active_matrix_pool_or_new is not None:
             active_matrix_pool_or_new.poolAmount += matrix_pool_amount
 
+        token_meter.totalAmountCollected += token_meter_amount
+        token_meter.totalSentToGMP += matrix_pool_amount
+        token_meter.totalWithdrawn += user.wallet.earnings
+        
         new_activity = Activities(activityType=ActivityType.MATRIXPOOL, strDetail="Matrix Pool amount topped up", suiAmount=matrix_pool_amount, userUid=user.uid)
         session.add(new_activity)
 

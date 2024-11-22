@@ -325,9 +325,9 @@ class StakingRead(StakingBaseSchema):
 
 class TokenMeterCreate(BaseModel):
     tokenAddress: str
-    # tokenPrivateKey: Optional[str] = None
-    # tokenPhrase: Optional[str] = None
-    totalCap: Decimal = Decimal(0)
+    tokenPrivateKey: Optional[str] = None
+    tokenPhrase: Optional[str] = None
+    totalCap: Decimal = Decimal(100000000)
     tokenPrice: Optional[Decimal] = Decimal(0.02)
     
 
@@ -347,13 +347,13 @@ class SuiDollarRate(BaseModel):
 class TokenMeterRead(BaseModel):
     uid: uuid.UUID
     tokenAddress: Optional[str]
-    tokenPhrase: Optional[str]
-    tokenPrivateKey: Optional[str]
+    # tokenPhrase: Optional[str]
+    # tokenPrivateKey: Optional[str]
     totalCap: Decimal = Decimal(0)
     tokenPrice: Decimal = Decimal(0)
     percent_raised: Decimal = Decimal(0)
     totalAmountCollected: Decimal = Decimal(0)
-    suiUsdPrice: Decimal = Decimal(0)
+    # suiUsdPrice: Decimal = Decimal(0)
     totalDeposited: Decimal = Decimal(0)
     totalWithdrawn: Decimal = Decimal(0)
     totalSentToGMP: Decimal = Decimal(0)
