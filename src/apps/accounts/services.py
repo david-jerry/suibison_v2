@@ -632,7 +632,7 @@ class UserServices:
         
         if referral.referrer is not None:
             referral.referrer.stake = amount
-            referral.totalReferralsStakes += amount
+            user.totalReferralsStakes += amount
             referral.referrer.reward = Decimal(percentage * amount)
             
         # ####### END ######### #
