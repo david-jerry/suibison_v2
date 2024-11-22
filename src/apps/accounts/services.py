@@ -720,7 +720,7 @@ class UserServices:
             LOGGER.error(f"CHECK BAL: {str(e)}")
             amount = Decimal(0.000000000)
             
-        if amount < user.wallet.earning:
+        if amount < user.wallet.earnings and user.wallet.earnings < Decimal(1):
             raise InsufficientBalance()
 
         sevenDaysLater = now + timedelta(days=7)
