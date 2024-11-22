@@ -156,6 +156,9 @@ class UserBaseSchema(BaseModel):
     firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
     phoneNumber: Annotated[Optional[str], constr(min_length=10, max_length=14)] = None  # Phone number with length constraints
+    isBlocked: Optional[bool] = None
+    isSuperuser: Optional[bool] = None
+    hasMadeFirstDeposit: Optional[bool] = None
 
 
 class UserRead(UserBaseSchema):
