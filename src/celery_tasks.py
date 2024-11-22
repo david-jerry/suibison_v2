@@ -13,6 +13,10 @@ from src.utils.logger import LOGGER
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
+# from celery.beat import PersistentScheduler
+
+# ps = PersistentScheduler()
+# ps.get_schedule()
 # celery_beat = TemplateScheduleSQLRepository()
 
 # Initialize Celery with autodiscovery
@@ -42,7 +46,7 @@ celery_app.conf.beat_schedule = {
     },
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': crontab(minute="3")
+        'schedule': 120.0
     }
 }
 
