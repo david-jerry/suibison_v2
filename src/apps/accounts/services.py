@@ -475,6 +475,8 @@ class UserServices:
 
                 # Update SBT records
                 if not user.hasMadeFirstDeposit:
+                    user.staking.start = now
+                    await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
                     user.hasMadeFirstDeposit = True
                     
                 token_meter.totalAmountCollected += sbt_amount
@@ -543,7 +545,10 @@ class UserServices:
 
                 # Update SBT records
                 if not user.hasMadeFirstDeposit:
+                    user.staking.start = now
+                    await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
                     user.hasMadeFirstDeposit = True
+
                     
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
@@ -595,11 +600,6 @@ class UserServices:
         # perform stake calculations
         await self.handle_stake_logic(amount, token_meter, user, session)
         
-        # Handle first-time staking
-        if not user.hasMadeFirstDeposit and amount > Decimal(0.0040000000):
-            user.staking.start = now
-            await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
-            user.hasMadeFirstDeposit = True
 
         await session.commit()
         await session.refresh(user)
