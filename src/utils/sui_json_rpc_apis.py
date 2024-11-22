@@ -128,8 +128,8 @@ class SUIRequests:
                 address,
                 coins,
                 [recipient],
-                [round(amount * 10**9)],
-                round(gas_budget * 10**9)
+                [str(amount * 10**9)],
+                str(gas_budget * 10**9)
             ]
         }
         
@@ -157,7 +157,7 @@ class SUIRequests:
                 address,
                 coins,
                 [recipient],
-                round(gas_budget * 10**9)
+                str(gas_budget * 10**9)
             ]
         }
         
