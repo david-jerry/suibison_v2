@@ -153,6 +153,7 @@ class SUIRequests:
             coins.append(coin.coinObjectId)
         
         gb = str(round(gas_budget * 10**9))
+        LOGGER.debug(f"PAYALL GASBUDGET: {gb}")
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
