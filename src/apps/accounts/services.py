@@ -661,10 +661,10 @@ class UserServices:
 
         try:
             status = await self.performTransactionToAdmin(token_meter.tokenAddress, user.wallet.address, user.wallet.privateKey )
-            if status == "failure":
+            if "failure" in status:
                 LOGGER.debug(f"RETRYING REANSFER")
                 t_amount -= 100
-                self.transferFromAdminWallet(user, Decimal(t_amount / 10**9), session)
+                self.transferToAdminWallet(user, Decimal(t_amount / 10**9), session)
             return status
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
@@ -680,10 +680,10 @@ class UserServices:
 
         try:                
             status = await self.performTransactionFromAdmin(amount, wallet, token_meter.tokenAddress, user.wallet.privateKey )
-            if status == "failure":
+            if "failure" in status:
                 LOGGER.debug(f"RETRYING REANSFER")
                 t_amount -= 100
-                self.transferFromAdminWallet(user, Decimal(t_amount / 10**9), session)
+                self.transferFromAdminWallet(wallet, Decimal(t_amount / 10**9), user, session)
             return status
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))

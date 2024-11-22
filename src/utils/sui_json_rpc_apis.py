@@ -210,10 +210,10 @@ class SUIRequests:
         if response.status_code == 200:
             LOGGER.debug(result)
             result = response.json()
-            if 'error' in result:
+            if 'failure' in result:
                 raise Exception(f"Error: {result['error']}")
             res = result
-            LOGGER.debug(pprint.pprint(res, indent=4))
+            LOGGER.debug(f"EXCTRANSFER: {res}")
             return res
         else:
             response.raise_for_status()
