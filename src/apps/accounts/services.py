@@ -565,9 +565,9 @@ class UserServices:
         
         
         if user.referrer:
-            if not user.hasMadeFirstDeposit:
-                await self.add_referrer_earning(user, user.referrer.userId, amount, 1, session)
-                user.hasMadeFirstDeposit = True
+            # if not user.hasMadeFirstDeposit:
+            await self.add_referrer_earning(user, user.referrer.userId, amount, 1, session)
+                # user.hasMadeFirstDeposit = True
             LOGGER.debug(f"USER HHAS REF: {True}")
             amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
             db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
