@@ -464,13 +464,12 @@ class UserServices:
             sbt_amount = Decimal(amount * Decimal(0.1))
             
             try:
-                digest, status = await self.transferToAdminWallet(user, amount, session)
-                
+                digest, status, transferred_amount = await self.transferToAdminWallet(user, amount, session)
                 if status == "failure":
                     raise HTTPException(status_code=400, detail=status)
                 
                 if pendingTransaction is not None:
-                    user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
+                    await session.delete(pendingTransaction)
                     await session.commit()
 
                 # Update SBT records
@@ -483,12 +482,12 @@ class UserServices:
                 token_meter.totalDeposited += amount
                 user.wallet.totalDeposit += amount
                 user.wallet.balance += amount
-                user.staking.deposit += amount_to_show
+                user.staking.deposit += transferred_amount
                 
                 if user.referrer:
                     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
                     referrer = db_res.first()
-                    await self.calc_team_volume(referrer, amount_to_show, 1, session)
+                    await self.calc_team_volume(referrer, transferred_amount, 1, session)
 
                 await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
                 
@@ -501,21 +500,17 @@ class UserServices:
                     stake.end = enddate
                     stake.nextRoiIncrease = now + timedelta(days=5)
 
-                    await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
+                    # await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
 
                     new_activity = Activities(activityType=ActivityType.DEPOSIT,
-                                            strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
+                                            strDetail="New Stake Run Started", suiAmount=transferred_amount, userUid=user.uid)
 
                     session.add(new_activity)
                     await session.commit()
                     await session.refresh(stake)
                 else:
-                    # stake.start = now
-                    # stake.end = enddate
-                    # stake.nextRoiIncrease = now + timedelta(days=5)
-
                     new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
-                                            suiAmount=amount_to_show, userUid=user.uid)
+                                            suiAmount=transferred_amount, userUid=user.uid)
                     session.add(new_activity)
                     await session.commit()
             except Exception as e:
@@ -534,31 +529,31 @@ class UserServices:
             
             try:
                 # Transfer to admin wallet
-                digest, status = await self.transferToAdminWallet(user, amount, session)
+                digest, status, transferred_amount = await self.transferToAdminWallet(user, amount, session)
                 
                 if status == "failure":
                     raise HTTPException(status_code=400, detail=status)
 
                 if pendingTransaction is not None:
-                    user.staking.deposit -= Decimal(pendingTransaction.amount * Decimal(pendingTransaction.amount * Decimal(0.1)))
+                    await session.delete(pendingTransaction)
                     await session.commit()
 
                 # Update SBT records
                 if not user.hasMadeFirstDeposit:
                     user.staking.start = now
-                    await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
+                    await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, transferred_amount, 1, session)
                     user.hasMadeFirstDeposit = True
 
                     
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
                 user.wallet.totalDeposit += amount
-                user.staking.deposit += amount_to_show
+                user.staking.deposit += transferred_amount
 
                 if user.referrer:
                     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
                     referrer = db_res.first()
-                    await self.calc_team_volume(referrer, amount_to_show, 1, session)
+                    await self.calc_team_volume(referrer, transferred_amount, 1, session)
 
                 await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
                 await session.commit()
@@ -701,7 +696,7 @@ class UserServices:
                 LOGGER.debug(f"RETRYING REANSFER")
                 t_amount -= 100
                 self.transferFromAdminWallet(user, Decimal(t_amount / 10**9), session)
-            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
+            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"], Decimal(t_amount / 10**9)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -729,7 +724,7 @@ class UserServices:
                 self.transferFromAdminWallet(wallet, Decimal(t_amount / 10**9), user, session)
                 
             LOGGER.debug(f"TRANSACTION STATUS: {status}")
-            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"]
+            return res["transaction"]["result"]["digest"], res["transaction"]["result"]["effects"]["status"]["status"], Decimal(t_amount / 10**9)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
