@@ -231,7 +231,9 @@ class UserServices:
 
         paid_users = []
         for u in referrals:
-            if u.user.staking.deposit > Decimal(0.000000000):
+            ref_db = await session.exec(select(User).where(User.userid == u.userId))
+            referrer = ref_db.first()
+            if referrer is not None and referrer.staking.deposit > Decimal(0.000000000):
                 paid_users.append(u)
 
         # check for fast boost and credit the users wallet balance accordingly
@@ -538,50 +540,6 @@ class UserServices:
                 nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
                 session.add(nw_pt)
                 await session.commit()
-        # elif Decimal(0.0040000000) < amount < Decimal(0.9):
-        #     amount_to_show = amount - (amount * Decimal(0.1))
-        #     sbt_amount = amount * Decimal(0.1)
-            
-        #     try:
-        #         # Transfer to admin wallet
-        #         digest, status, amount_to_show = await self.transferToAdminWallet(user, amount, session)
-                
-        #         if status == "failure":
-        #             raise HTTPException(status_code=400, detail=status)
-
-        #         if pendingTransaction is not None:
-        #             await session.delete(pendingTransaction)
-        #             await session.commit()
-
-        #         # Update SBT records
-        #         if not user.hasMadeFirstDeposit:
-        #             user.staking.start = now
-        #             await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount_to_show, 1, session)
-        #             user.hasMadeFirstDeposit = True
-
-                    
-        #         token_meter.totalAmountCollected += sbt_amount
-        #         token_meter.totalDeposited += amount
-        #         user.wallet.totalDeposit += amount
-        #         user.staking.deposit += amount_to_show
-
-        #         if user.referrer:
-        #             db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-        #             referrer = db_res.first()
-        #             await self.calc_team_volume(referrer, amount_to_show, 1, session)
-
-        #         await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
-        #         await session.commit()
-        #     except Exception as e:
-        #         LOGGER.debug(f"Transfering to admin error: {str(e)}")
-        #         if pendingTransaction is not None:
-        #             await session.delete(pendingTransaction)
-        #             user.staking.deposit -= pendingTransaction.amount
-                    
-        #         user.staking.deposit += amount
-        #         nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
-        #         session.add(nw_pt)
-        #         await session.commit()
         elif Decimal(0.0050000000) <= amount:
             pass
 
@@ -738,7 +696,6 @@ class UserServices:
             return status
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-
 
     async def withdrawToUserWallet(self, user: User, withdrawal_wallet: str, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
