@@ -612,10 +612,12 @@ class UserServices:
 
         # add referrals and their rewards
         rf_db = await session.exec(select(UserReferral).where(UserReferral.theirUserId == referral.userId).where(UserReferral.userId == referrer))
-        referral_to_update = rf_db 
-        referral_to_update.stake = amount
+        referral_to_update = rf_db.first()
+        
+        if referral_to_update:
+            referral_to_update.stake = amount
+            referral_to_update.reward = percentage * amount
         referring_user.totalReferralsStakes += amount
-        referral_to_update.reward = percentage * amount
         
         # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
