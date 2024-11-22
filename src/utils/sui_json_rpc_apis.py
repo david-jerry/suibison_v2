@@ -128,8 +128,8 @@ class SUIRequests:
                 address,
                 coins,
                 [recipient],
-                [str(amount * 10**9)],
-                str(gas_budget * 10**9)
+                [str(round(amount * 10**9))],
+                str(round(gas_budget * 10**9))
             ]
         }
         
@@ -138,7 +138,7 @@ class SUIRequests:
         if response.status_code == 200:
             result = response.json()
             if 'error' in result:
-                raise Exception(f"Error: {result['error']}")
+                raise Exception(f"PAYSUI-Error: {result['error']}")
             LOGGER.debug(pprint.pprint(result, indent=4))
             res = result["result"]
             return SuiTransferResponse(**res)
@@ -149,6 +149,8 @@ class SUIRequests:
         coins = []
         for coin in coinIds:
             coins.append(coin.coinObjectId)
+        
+        gb = str(round(gas_budget * 10**9))
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -157,7 +159,7 @@ class SUIRequests:
                 address,
                 coins,
                 [recipient],
-                str(gas_budget * 10**9)
+                gb
             ]
         }
         
@@ -166,7 +168,7 @@ class SUIRequests:
         if response.status_code == 200:
             result = response.json()
             if 'error' in result:
-                raise Exception(f"Error: {result['error']}")
+                raise Exception(f"PAYALLSUI- Error: {result['error']}")
             res = result["result"]
             return SuiTransferResponse(**res)
         else:
