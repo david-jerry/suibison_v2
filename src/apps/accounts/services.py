@@ -562,9 +562,9 @@ class UserServices:
         except Exception as e:
             raise HTTPException(status_code=400, detail="Staking Failed")
         
-        if user.hasMadeFirstDeposit:
+        if not user.hasMadeFirstDeposit:
             await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
-            user.hasMadeFirstDeposit = False
+            user.hasMadeFirstDeposit = True
             await session.commit()
         
         if user.referrer:
