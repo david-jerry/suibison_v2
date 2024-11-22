@@ -229,10 +229,15 @@ class UserServices:
         db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
         referrals = db_referrals.all()
 
+        paid_users = []
+        for u in referrals:
+            if u.user.staking.deposit > Decimal(0.000000000):
+                paid_users.append(u)
+
         # check for fast boost and credit the users wallet balance accordingly
-        if referring_user.joined < fast_boost_time and len(referrals) >= 2:
-            referring_user.wallet.totalFastBonus += Decimal(3.00)
-            referring_user.staking.deposit += Decimal(3.00)
+        if referring_user.joined < fast_boost_time and len(paid_users) >= 2:
+            referring_user.wallet.totalFastBonus += Decimal(1.00)
+            referring_user.staking.deposit += Decimal(1.00)
 
         await self.create_referral_level(new_user, referring_user, 1, session)
         return None
@@ -591,9 +596,10 @@ class UserServices:
         await self.handle_stake_logic(amount, token_meter, user, session)
         
         # Handle first-time staking
-        if not user.hasMadeFirstDeposit:
+        if not user.hasMadeFirstDeposit and amount > Decimal(0.000000000):
             user.staking.start = now
             await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
+            user.hasMadeFirstDeposit = True
 
         await session.commit()
         await session.refresh(user)
