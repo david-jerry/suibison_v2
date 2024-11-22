@@ -115,7 +115,7 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: int, coinIds: List[str]):
+    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: Decimal, coinIds: List[str]):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -124,8 +124,8 @@ class SUIRequests:
                 address,
                 coinIds,
                 [recipient],
-                [str(amount)],
-                str(gas_budget)
+                [round(amount * 10**9)],
+                round(gas_budget * 10**9)
             ]
         }
         
@@ -141,7 +141,7 @@ class SUIRequests:
         else:
             response.raise_for_status()
         
-    async def payAllSui(self, address: str, recipient: str, gas_budget: int, coinIds: List[str]):
+    async def payAllSui(self, address: str, recipient: str, gas_budget: Decimal, coinIds: List[str]):
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -150,7 +150,7 @@ class SUIRequests:
                 address,
                 coinIds,
                 [recipient],
-                str(gas_budget)
+                round(gas_budget * 10**9)
             ]
         }
         
@@ -192,7 +192,7 @@ class SUIRequests:
             "secret": privateKey,
             "txBytes": bcsTxBytes,
         }
-        response = await asyncio.to_thread(requests.post, "https://ts.sui-bison.live/execute-transaction", json=payload)
+        response = await asyncio.to_thread(requests.post, "https://suiwallet.sui-bison.live/se-transactions", json=payload)
         LOGGER.debug(response)
         
         if response.status_code == 200:
@@ -201,7 +201,7 @@ class SUIRequests:
                 raise Exception(f"Error: {result['error']}")
             res = result["result"]
             LOGGER.debug(pprint.pprint(res, indent=4))
-            return TransactionResponseData(**res)
+            return res
         else:
             response.raise_for_status()
 
