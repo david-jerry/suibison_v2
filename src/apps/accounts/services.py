@@ -625,14 +625,14 @@ class UserServices:
         elif level == 5:
             percentage = Decimal(0.01)
 
-        referral.referrer.reward = Decimal(percentage * amount)
+        referral.referrer.reward = percentage * amount
         # Save the referral level down to the 5th level in redis for improved performance
-        referring_user.wallet.earnings += Decimal(percentage * amount)
-        referring_user.wallet.availableReferralEarning += Decimal(percentage * amount)
-        referring_user.wallet.totalReferralEarnings += Decimal(percentage * amount)
-        referring_user.wallet.totalReferralBonus += Decimal(percentage * amount)
+        referring_user.wallet.earnings += percentage * amount
+        referring_user.wallet.availableReferralEarning += percentage * amount
+        referring_user.wallet.totalReferralEarnings += percentage * amount
+        referring_user.wallet.totalReferralBonus += percentage * amount
         
-        LOGGER.info(f"REFERAL EARNING FOR {referring_user.firstName if referring_user.firstName else referring_user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
+        LOGGER.info(f"REFERAL EARNING FOR {referring_user.firstName if referring_user.firstName else referring_user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount):.2f}")
         # ####### END ######### #
         
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=referring_user.uid)
