@@ -33,7 +33,7 @@ celery_app.autodiscover_tasks(packages=['src.apps.accounts'], related_name='task
 celery_app.conf.beat_schedule = {
     'fetch-every-60-seconds': {
         'task': 'fetch_sui_usd_price_hourly',
-        'schedule': 60.0,
+        'schedule': 120.0,
     },
     'run_calculate_daily_tasks': {
         'task': 'run_calculate_daily_tasks',
