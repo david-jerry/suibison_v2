@@ -48,7 +48,7 @@ celery_app.conf.beat_schedule = {
     # 15 minutes
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': 60 * 15
+        'schedule': 60 * 7
     }
 }
 
