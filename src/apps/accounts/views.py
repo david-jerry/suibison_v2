@@ -299,6 +299,9 @@ async def delete_a_user(userId: str, session: session):
         
     for pu in all_pool:
         await session.delete(pu)
+        
+    for pt in user.pendingTransactions:
+        await session.delete(pt)
     
     await session.delete(user)
     await session.commit()

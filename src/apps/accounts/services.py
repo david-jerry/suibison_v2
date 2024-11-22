@@ -515,11 +515,11 @@ class UserServices:
                 LOGGER.debug(f"Transfering to admin error: {str(e)}")
                 if pendingTransaction is not None:
                     await session.delete(pendingTransaction)
+                    user.staking.deposit -= pendingTransaction.amount
                     
                 nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
                 session.add(nw_pt)
                 await session.commit()
-                user.staking.deposit -= pendingTransaction.amount
                 user.staking.deposit += amount
         elif Decimal(0.000000000) < amount < Decimal(0.9):
             amount_to_show = amount - (amount * Decimal(0.1))
