@@ -320,7 +320,7 @@ async def delete_a_user(userId: str, session: session):
     "/{userId}",
     status_code=status.HTTP_200_OK,
     response_model=UserWithReferralsRead,
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(admin_permission_check)],
     description="Update records for a specific user by providing their userId as a required field ad then the body form data to update with"
 )
 async def update_profile(userId: str, form_data: Annotated[UserUpdateSchema, Body()], session: session):
