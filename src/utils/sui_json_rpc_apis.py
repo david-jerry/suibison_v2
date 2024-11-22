@@ -161,7 +161,7 @@ class SUIRequests:
             "params": [
                 address,
                 coins,
-                [recipient],
+                recipient,
                 gb
             ]
         }
