@@ -610,7 +610,7 @@ class UserServices:
                 if refd is not None:
                     ref_deposit += refd.staking.deposit
 
-            if (ref_deposit >= user.staking.deposit) and not user.usedSpeedBoost:
+            if (ref_deposit >= (user.staking.deposit * 2)) and not user.usedSpeedBoost:
                 user.staking.roi += Decimal(0.005)
                 user.usedSpeedBoost = True
         # End Speed Boost
@@ -638,6 +638,7 @@ class UserServices:
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
         
         session.add(ref_activity)
+        session.commit()
         if level < 6:
             return self.add_referrer_earning(referral, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
         return None

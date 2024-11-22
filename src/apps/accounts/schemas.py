@@ -183,9 +183,9 @@ class UserRead(UserBaseSchema):
     joined: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
-    @staticmethod
-    def get_rank_from_wallet(wallet: "WalletRead"):
-        return wallet.rankTitle if wallet is not None else None
+    # @staticmethod
+    # def get_rank_from_wallet(wallet: "WalletRead"):
+    #     return wallet.rankTitle if wallet is not None else None
 
     @staticmethod
     def calculate_age(dob: Optional[datetime]) -> int:
@@ -278,20 +278,20 @@ class WalletBaseSchema(BaseModel):
     totalReferralEarnings: Decimal = Decimal(0)
     totalreferralBonus: Decimal = Decimal(0)
 
-    @staticmethod
-    def calculate_referral_bonus(dob: Optional[datetime]) -> int:
-        if dob:
-            today = datetime.today().date()
-            age = today.year - dob.year - (
-                (today.month, today.day) < (dob.month, dob.day)
-            )
-            return age
-        return 0
+    # @staticmethod
+    # def calculate_referral_bonus(dob: Optional[datetime]) -> int:
+    #     if dob:
+    #         today = datetime.today().date()
+    #         age = today.year - dob.year - (
+    #             (today.month, today.day) < (dob.month, dob.day)
+    #         )
+    #         return age
+    #     return 0
 
-    @classmethod
-    def from_orm(cls, user: "UserRead"):
-        user_dict = user.model_dump()
-        user_dict["totalreferralBonus"] = cls.calculate_age(user.dob)
+    # @classmethod
+    # def from_orm(cls, user: "UserRead"):
+    #     user_dict = user.model_dump()
+    #     user_dict["totalreferralBonus"] = cls.calculate_referral_bonus()
 
 class WalletRead(WalletBaseSchema):
     uid: uuid.UUID
