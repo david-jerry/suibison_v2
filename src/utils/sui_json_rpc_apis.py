@@ -212,7 +212,7 @@ class SUIRequests:
             result = response.json()
             if 'error' in result:
                 raise Exception(f"Error: {result['error']}")
-            res = result["result"]
+            res = result
             LOGGER.debug(pprint.pprint(res, indent=4))
             return res
         else:
