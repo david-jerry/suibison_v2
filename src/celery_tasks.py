@@ -41,7 +41,7 @@ celery_app.conf.beat_schedule = {
     },
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': crontab(minute="15")
+        'schedule': crontab(minute="3")
     }
 }
 

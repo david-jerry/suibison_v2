@@ -228,6 +228,8 @@ class UserServices:
         fast_boost_time = referring_user.joined + timedelta(hours=24)
         db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
         referrals = db_referrals.all()
+        
+        LOGGER.debug(f"REFERRALS FOR {referring_user.firstName} = {len(referrals)}")
 
         # paid_users = []
         # for u in referrals:
@@ -454,13 +456,13 @@ class UserServices:
         coinIds = await SUI.getCoins(sender)
         transferResponse = await SUI.payAllSui(sender, recipient, Decimal(0.005), coinIds)
         transaction = await SUI.executeTransaction(transferResponse.txBytes, privKey)
-        return transaction["transaction"]["result"]["effects"]["status"]["status"]
+        return transaction
 
     async def performTransactionFromAdmin(self, amount: Decimal, recipient: str, sender: str, privKey: str) -> str:
         coinIds = await SUI.getCoins(sender)
         transferResponse = await SUI.paySui(sender, recipient, amount, Decimal(0.005), coinIds)
         transaction = await SUI.executeTransaction(transferResponse.txBytes, privKey)
-        return transaction["transaction"]["result"]["effects"]["status"]["status"]
+        return transaction
     
     async def handle_stake_logic(self, amount: Decimal, token_meter: TokenMeter, user: User, session: AsyncSession):
         LOGGER.debug(f"FIRST CHECK PASS? : {Decimal(0.00500000) < amount}")
@@ -478,9 +480,9 @@ class UserServices:
             sbt_amount = Decimal(amount * Decimal(0.1))
             
             try:
-                status = await self.transferToAdminWallet(user, amount, session)
-                if status == "failure":
-                    raise HTTPException(status_code=400, detail=f"There was a transfer failure with status: {status}")
+                transactionData = await self.transferToAdminWallet(user, amount, session)
+                if "failure" in transactionData:
+                    raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
                 
                 if pendingTransaction is not None:
                     await session.delete(pendingTransaction)
@@ -657,14 +659,6 @@ class UserServices:
         if token_meter is None:
             raise TokenMeterDoesNotExists()
 
-        # coinDetail = await SUI.getCoins(user.wallet.address)
-        # coins = []
-        # for coin in coinDetail:
-        #     if coin.coinType == "0x2::sui::SUI":
-        #         coins.append(coin.coinObjectId)
-        # try:
-        #     transResponse = await SUI.payAllSui(user.wallet.address, token_meter.tokenAddress, 10000, coins)
-        #     return transResponse.txBytes
         try:
             status = await self.performTransactionToAdmin(token_meter.tokenAddress, user.wallet.address, user.wallet.privateKey )
             if status == "failure":
@@ -684,20 +678,7 @@ class UserServices:
         if token_meter is None:
             raise TokenMeterDoesNotExists()
 
-        try:
-            # url = "https://suiwallet.sui-bison.live/wallet/transfer-sui"
-            # body = {
-            #     "secret": token_meter.tokenPrivateKey,
-            #     "amount": t_amount,
-            #     "recipient": wallet
-            # }
-            # res = await self.sui_wallet_endpoint(url, body)
-            # status = res["transaction"]["result"]["effects"]["status"]["status"]
-            # if status == "failure":
-            #     LOGGER.debug(f"RETRYING WITHDRAWAL")
-            #     t_amount -= 100
-            #     self.transferFromAdminWallet(wallet, Decimal(t_amount / 10**9), user, session)
-                
+        try:                
             status = await self.performTransactionFromAdmin(amount, wallet, token_meter.tokenAddress, user.wallet.privateKey )
             if status == "failure":
                 LOGGER.debug(f"RETRYING REANSFER")
@@ -743,10 +724,9 @@ class UserServices:
         t_amount = round(withdawable_amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
 
 
-        digest, status = await self.transferFromAdminWallet(withdrawal_wallet, t_amount, user, session)
-        
-        if status == "faiilure":
-            raise HTTPException(status_code=400, detail=status)
+        transactionData = await self.transferFromAdminWallet(withdrawal_wallet, t_amount, user, session)
+        if "failure" in transactionData:
+            raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
         
         new_activity = Activities(activityType=ActivityType.WITHDRAWAL, strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
         session.add(new_activity)
