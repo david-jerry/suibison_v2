@@ -225,12 +225,11 @@ class UserStaking(SQLModel, table=True):
     user: Optional[User] = Relationship(back_populates="staking")
 
     start: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(pg.TIMESTAMP, default=datetime.utcnow),
+        sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
     )
-    end: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column=Column(pg.TIMESTAMP, default=datetime.utcnow),
+    
+    end: Optional[datetime] = Field(
+        sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
     )
     nextRoiIncrease: Optional[datetime] = Field(
         sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),

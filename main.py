@@ -61,15 +61,7 @@ The API may have rate limits to prevent abuse. Please refer to the official Next
 @asynccontextmanager
 async def life_span(app: FastAPI):
     LOGGER.info("Server is running")
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     await init_db()
-    # celery_app.start()
-    
-    # try:
-    #     await fetch_sui_price()
-    # except Exception as e:
-    #     LOGGER.debug(f"SUI Balance Error: {pprint.pprint(e, indent=4, depth=4)}")
     yield
     LOGGER.info("Server has stopped")
 

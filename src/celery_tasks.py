@@ -35,6 +35,10 @@ celery_app.conf.beat_schedule = {
         'task': 'fetch_sui_usd_price_hourly',
         'schedule': 60.0,
     },
+    'run_calculate_daily_tasks': {
+        'task': 'run_calculate_daily_tasks',
+        'schedule': crontab(minute="0", hour="0")
+    },
 }
 
 

@@ -273,10 +273,6 @@ class UserServices:
         if user is not None and user.isBlocked:
             raise UserBlocked()
 
-        # update the users rank record immediately they open the webapp and the weeks match up
-        if user is not None:
-            await self.calculate_rank_earning(user, session)
-
         # generate access and refresh token so long the telegram init data is valid
         accessToken = createAccessToken(
             user_data={
@@ -308,9 +304,6 @@ class UserServices:
         # check if the user is blocked
         if user.isBlocked:
             raise UserBlocked()
-
-        # TODO: update the users rank record immediately they open the webapp and the weeks match up
-        await self.calculate_rank_earning(user, session)
 
         # # Process active stake balances and earnings
         # if user is not None and user.wallet.staking.endingAt <= datetime.now():
@@ -476,6 +469,9 @@ class UserServices:
                     await session.commit()
 
                 # Update SBT records
+                if not user.hasMadeFirstDeposit:
+                    user.hasMadeFirstDeposit = True
+                    
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
                 user.wallet.totalDeposit += amount
@@ -541,6 +537,9 @@ class UserServices:
                     await session.commit()
 
                 # Update SBT records
+                if not user.hasMadeFirstDeposit:
+                    user.hasMadeFirstDeposit = True
+                    
                 token_meter.totalAmountCollected += sbt_amount
                 token_meter.totalDeposited += amount
                 user.wallet.totalDeposit += amount
@@ -593,6 +592,7 @@ class UserServices:
         
         # Handle first-time staking
         if not user.hasMadeFirstDeposit:
+            user.staking.start = now
             await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
 
         await session.commit()
@@ -658,39 +658,9 @@ class UserServices:
         if level < 6:
             return self.add_referrer_earning(referral, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
         return None
+    
     # ##### TODO:END
 
-
-
-
-    # ###### UNVERIFIED TO BE WORKING
-    async def calculate_rank_earning(self, user: User, session: AsyncSession):
-        db_result = await session.exec(select(UserReferral).where(UserReferral.userUid == user.uid).where(UserReferral.level == 1))
-        referrals = db_result.all()
-        rankErning, rank = await get_rank(user.totalTeamVolume, user.wallet.totalDeposit, referrals)
-        
-        if user.rank != rank:
-            user.rank = rank
-
-        user.wallet.weeklyRankEarnings = rankErning
-
-        # Calculate days since last rank earning
-        days_since_last_earning = (now.date() - user.lastRankEarningAddedAt.date()).days
-
-        # Calculate weeks using integer division (discarding remainder)
-        weeks_earned = days_since_last_earning // 7
-
-        # Check if there are weeks to be added
-        if weeks_earned > 0:
-            user.wallet.earnings += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
-            user.wallet.totalRankBonus += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
-            user.wallet.expectedRankBonus += Decimal(user.wallet.weeklyRankEarnings * weeks_earned)
-
-            # Update lastRankEarningAddedAt to reflect the latest calculation
-            user.lastRankEarningAddedAt = now - timedelta(days=days_since_last_earning % 7)
-
-        session.add(user)
-        return None
 
     async def transferToAdminWallet(self, user: User, amount: Decimal, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
@@ -821,33 +791,3 @@ class UserServices:
         await session.refresh(active_matrix_pool_or_new)
 
     # ##### UNVERIFIED ENDING
-
-    # async def calculate_and_update_staked_interest_every_5_days(self, user: User, session: AsyncSession, stake: UserStaking):
-    #     """
-    #     This calculates and updates the interest on a stake until its expiry date.
-
-    #     Args:
-    #         session: The database session object.
-    #         stake: The UserStaking object representing the stake.
-    #     """
-    #     now = datetime.now()
-    #     remaining_days = (stake.end - now).days
-
-    #     # loop this task until staking expiry date has reached then stop it
-    #     if remaining_days > 0:
-    #         # calculate interest based on remaining days and ensure the roi is less than 4%
-    #         if (stake.roi < Decimal(0.04)) and (stake.nextRoiIncrease == now):
-    #             new_roi = stake.roi + Decimal(0.005)
-    #             stake.roi = new_roi
-    #         interest_earned = stake.deposit * new_roi
-    #         user.wallet.earnings += interest_earned
-    #         stake.nextRoiIncrease = now + timedelta(days=5)
-    #         user.wallet.earnings += (stake.deposit * stake.roi)
-
-    #     if remaining_days == 0 or stake.end <= now:
-    #         stake.roi = 0.01
-    #         stake.nextRoiIncrease = None
-
-    #     await session.commit()
-    #     await session.refresh(stake)
-    #     return None
