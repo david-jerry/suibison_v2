@@ -531,6 +531,8 @@ class UserServices:
                 if pendingTransaction is not None:
                     await session.delete(pendingTransaction)
                     user.staking.deposit -= pendingTransaction.amount
+                    await session.commit()
+                    await session.refreshh(user)
                     
                 user.staking.deposit += amount
                 nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
