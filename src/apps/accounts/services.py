@@ -229,15 +229,15 @@ class UserServices:
         db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
         referrals = db_referrals.all()
 
-        paid_users = []
-        for u in referrals:
-            ref_db = await session.exec(select(User).where(User.userId == u.userId))
-            referrer = ref_db.first()
-            if referrer is not None and referrer.staking.deposit > Decimal(0.000000000):
-                paid_users.append(u)
+        # paid_users = []
+        # for u in referrals:
+        #     ref_db = await session.exec(select(User).where(User.userId == u.userId))
+        #     referrer = ref_db.first()
+        #     if referrer is not None and referrer.staking.deposit > Decimal(0.000000000):
+        #         paid_users.append(u)
 
         # check for fast boost and credit the users wallet balance accordingly
-        if referring_user.joined < fast_boost_time and len(paid_users) >= 2:
+        if referring_user.joined < fast_boost_time and len(referrals) >= 2:
             referring_user.wallet.totalFastBonus += Decimal(1.00)
             referring_user.staking.deposit += Decimal(1.00)
 
@@ -447,8 +447,7 @@ class UserServices:
             if referrer.referrer is not None:
                 level_referrer_db = await session.exec(select(User).where(User.userId == referrer.referrer.userId))
                 level_referrer = level_referrer_db.first()
-                if level_referrer is not None:
-                    self.calc_team_volume(level_referrer, amount, level + 1, session)
+                self.calc_team_volume(level_referrer, amount, level + 1, session)
         return None
            
     async def performTransactionToAdmin(self, recipient: str, sender: str, privKey: str) -> str:
@@ -500,6 +499,7 @@ class UserServices:
                 user.staking.deposit += amount_to_show
                 
                 if user.referrer:
+                    LOGGER.debug(f"USER HHAS REF: {True}")
                     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
                     referrer = db_res.first()
                     await self.calc_team_volume(referrer, amount_to_show, 1, session)
