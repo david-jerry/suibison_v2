@@ -614,7 +614,7 @@ class UserServices:
         rf_db = await session.exec(select(UserReferral).where(UserReferral.theirUserId == referral.userId).where(UserReferral.userId == referrer))
         referral_to_update = rf_db.first()
         
-        LOGGER.debug(f"REFERRAL TO UPDATE: {referral_to_update}")
+        LOGGER.debug(f"REFERRAL TO UPDATE: {referral_to_update.user.firstName}")
         if referral_to_update is not None:
             referral_to_update.stake += amount
             referral_to_update.reward += percentage * amount
