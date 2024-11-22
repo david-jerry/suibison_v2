@@ -563,11 +563,11 @@ class UserServices:
         except Exception as e:
             raise HTTPException(status_code=400, detail="Staking Failed")
         
-        await self.add_referrer_earning(user, user.referrer.userId if user.referrer else None, amount, 1, session)
-        user.hasMadeFirstDeposit = True
-        await session.commit()
         
         if user.referrer:
+            if not user.hasMadeFirstDeposit:
+                await self.add_referrer_earning(user, user.referrer.userId, amount, 1, session)
+                user.hasMadeFirstDeposit = True
             LOGGER.debug(f"USER HHAS REF: {True}")
             amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
             db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
@@ -595,21 +595,25 @@ class UserServices:
         LOGGER.debug("eexecuting referral earning calculations")
         
         db_result = await session.exec(select(User).where(User.userId == referrer))
-        user = db_result.first()
 
-        if user is None:
+        referring_user = db_result.first()
+
+        if referring_user is None:
             LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO")
             return None
 
         LOGGER.debug("passed user check")
+        
         # check for speed boost
         # fetch referrals for the referrer if available
         ref_db_result = await session.exec(select(UserReferral).where(UserReferral.userId == referrer))
         referrals = ref_db_result.all()
-        
         LOGGER.debug("Fetched all referrals")
 
-        ref_deposit = Decimal(0.000000000)
+        # add referrals and their rewards
+        referral.referrer.stake = amount
+        referring_user.totalReferralsStakes += amount
+        referral.referrer.reward = Decimal(percentage * amount)
         
         # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
@@ -623,40 +627,36 @@ class UserServices:
             percentage = Decimal(0.01)
 
         # Save the referral level down to the 5th level in redis for improved performance
-        user.wallet.earnings += Decimal(percentage * amount)
-        user.wallet.availableReferralEarning += Decimal(percentage * amount)
-        user.wallet.totalReferralEarnings += Decimal(percentage * amount)
-        user.wallet.totalReferralBonus += Decimal(percentage * amount)
+        referring_user.wallet.earnings += Decimal(percentage * amount)
+        referring_user.wallet.availableReferralEarning += Decimal(percentage * amount)
+        referring_user.wallet.totalReferralEarnings += Decimal(percentage * amount)
+        referring_user.wallet.totalReferralBonus += Decimal(percentage * amount)
         
-        LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
-        
-        if referral.referrer is not None:
-            referral.referrer.stake = amount
-            user.totalReferralsStakes += amount
-            referral.referrer.reward = Decimal(percentage * amount)
-            
+        LOGGER.info(f"REFERAL EARNING FOR {referring_user.firstName if referring_user.firstName else referring_user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         # ####### END ######### #
         
-        ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
+        ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=referring_user.uid)
         
 
+        ref_deposit = Decimal(0.000000000)
         # if the referrer is not none and has atleast one referral
-        if user.totalReferrals > Decimal(0):
+        if referring_user.totalReferrals > Decimal(0):
             for ref in referrals:
                 refd_db = await session.exec(select(User).where(User.uid == ref.userUid))
                 refd = refd_db.first()
                 if refd is not None:
                     ref_deposit += refd.staking.deposit
 
-            if (ref_deposit >= (user.staking.deposit * 2)) and not user.usedSpeedBoost:
-                user.staking.roi += Decimal(0.005)
-                user.usedSpeedBoost = True
+            if (ref_deposit >= (referring_user.staking.deposit * 2)) and not referring_user.usedSpeedBoost:
+                referring_user.staking.roi += Decimal(0.005)
+                referring_user.usedSpeedBoost = True
         # End Speed Boost
 
         session.add(ref_activity)
         session.commit()
-        if level < 6:
-            return self.add_referrer_earning(referral, user.referrer.userId if user.referrer is not None else None, amount, level + 1, session)
+
+        if level < 6 and referring_user.referrer:
+            return self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
         return None
     
     # ##### TODO:END
