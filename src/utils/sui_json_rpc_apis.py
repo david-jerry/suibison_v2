@@ -206,17 +206,10 @@ class SUIRequests:
             "txBytes": bcsTxBytes,
         }
         response = await asyncio.to_thread(requests.post, "https://suiwallet.sui-bison.live/wallet/se-transactions", json=payload)
+        LOGGER.debug(response.json)
         
-        if response.status_code == 200:
-            LOGGER.debug(result)
-            result = response.json()
-            if 'failure' in result:
-                raise Exception(f"Error: {result['error']}")
-            res = result
-            LOGGER.debug(f"EXCTRANSFER: {res}")
-            return res
-        else:
-            response.raise_for_status()
+        result = response.json()
+        return result
 
 SUI = SUIRequests()
 
