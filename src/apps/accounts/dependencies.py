@@ -82,3 +82,4 @@ async def admin_permission_check(auth_user: Annotated[User, Depends(get_current_
     if auth_user.isBlocked:
         raise UserBlocked()
     return auth_user
+

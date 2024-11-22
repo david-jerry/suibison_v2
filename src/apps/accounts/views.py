@@ -316,6 +316,38 @@ async def delete_a_user(userId: str, session: session):
         "message": "Successfully Deleted",
     }
 
+@auth_router.patch(
+    "/{userId}",
+    status_code=status.HTTP_200_OK,
+    response_model=UserWithReferralsRead,
+    dependencies=[Depends(get_current_user)],
+    description="Update records for a specific user by providing their userId as a required field ad then the body form data to update with"
+)
+async def update_profile(userId: str, form_data: Annotated[UserUpdateSchema, Body()], session: session):
+    db_user = await session.exec(select(User).where(User.userId == userId))
+    user = db_user.first()
+
+    res_user = await user_service.updateUserProfile(user, form_data, session)
+    referralsLv1List = await session.exec(select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv2List = await session.exec(select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
+    
+    referralsLv1 = referralsLv1List.all()
+    referralsLv2 = referralsLv2List.all()
+    referralsLv3 = referralsLv3List.all()
+    referralsLv4 = referralsLv4List.all()
+    referralsLv5 = referralsLv5List.all()
+    
+    return {
+        "user": res_user, 
+        "referralsLv1": referralsLv1,
+        "referralsLv2": referralsLv2,
+        "referralsLv3": referralsLv3,
+        "referralsLv4": referralsLv4,
+        "referralsLv5": referralsLv5,
+    }
 
 
 
