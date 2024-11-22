@@ -501,7 +501,7 @@ class UserServices:
                 stake = user.staking
 
                 # if there is a top up or new stake balance then run else just skip
-                if stake.end < now:
+                if stake.end is None:
                     stake.start = now
                     stake.end = enddate
                     stake.nextRoiIncrease = now + timedelta(days=5)
