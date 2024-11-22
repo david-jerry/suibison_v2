@@ -231,7 +231,7 @@ class UserServices:
 
         paid_users = []
         for u in referrals:
-            ref_db = await session.exec(select(User).where(User.userid == u.userId))
+            ref_db = await session.exec(select(User).where(User.userId == u.userId))
             referrer = ref_db.first()
             if referrer is not None and referrer.staking.deposit > Decimal(0.000000000):
                 paid_users.append(u)
