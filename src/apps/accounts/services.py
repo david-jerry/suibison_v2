@@ -605,20 +605,8 @@ class UserServices:
         referrals = ref_db_result.all()
 
         ref_deposit = Decimal(0.000000000)
-
-        # if the referrer is not none and has atleast one referral
-        if user.totalReferrals > Decimal(0):
-            for ref in referrals:
-                refd_db = await session.exec(select(User).where(User.userId == ref.theirUserId))
-                refd = refd_db.first()
-                if refd is not None:
-                    ref_deposit += refd.staking.deposit
-
-            if (ref_deposit >= (user.staking.deposit * 2)) and not user.usedSpeedBoost:
-                user.staking.roi += Decimal(0.005)
-                user.usedSpeedBoost = True
-        # End Speed Boost
-
+        
+        # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
         if level == 2:
             percentage = Decimal(0.05)
@@ -637,10 +625,27 @@ class UserServices:
         
         LOGGER.info(f"REFERAL EARNING FOR {user.firstName if user.firstName else user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount)}")
         
-        referral.referrer.reward = Decimal(percentage * amount)
+        if referral.referrer is not None:
+            referral.referrer.reward = Decimal(percentage * amount)
+            
+        # ####### END ######### #
         
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=user.uid)
         
+
+        # if the referrer is not none and has atleast one referral
+        if user.totalReferrals > Decimal(0):
+            for ref in referrals:
+                refd_db = await session.exec(select(User).where(User.uid == ref.userUid))
+                refd = refd_db.first()
+                if refd is not None:
+                    ref_deposit += refd.staking.deposit
+
+            if (ref_deposit >= (user.staking.deposit * 2)) and not user.usedSpeedBoost:
+                user.staking.roi += Decimal(0.005)
+                user.usedSpeedBoost = True
+        # End Speed Boost
+
         session.add(ref_activity)
         session.commit()
         if level < 6:
