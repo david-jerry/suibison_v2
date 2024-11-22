@@ -613,7 +613,6 @@ class UserServices:
         # add referrals and their rewards
         referral.referrer.stake = amount
         referring_user.totalReferralsStakes += amount
-        referral.referrer.reward = Decimal(percentage * amount)
         
         # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
@@ -626,6 +625,7 @@ class UserServices:
         elif level == 5:
             percentage = Decimal(0.01)
 
+        referral.referrer.reward = Decimal(percentage * amount)
         # Save the referral level down to the 5th level in redis for improved performance
         referring_user.wallet.earnings += Decimal(percentage * amount)
         referring_user.wallet.availableReferralEarning += Decimal(percentage * amount)
