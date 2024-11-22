@@ -115,14 +115,18 @@ class SUIRequests:
         else:
             response.raise_for_status()
 
-    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: Decimal, coinIds: List[str]):
+    async def paySui(self, address: str, recipient: str, amount: Decimal, gas_budget: Decimal, coinIds: List[Coin]):
+        coins = []
+        for coin in coinIds:
+            coins.append(coin.coinObjectId)
+
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_paySui",
             "params": [
                 address,
-                coinIds,
+                coins,
                 [recipient],
                 [round(amount * 10**9)],
                 round(gas_budget * 10**9)
@@ -141,14 +145,17 @@ class SUIRequests:
         else:
             response.raise_for_status()
         
-    async def payAllSui(self, address: str, recipient: str, gas_budget: Decimal, coinIds: List[str]):
+    async def payAllSui(self, address: str, recipient: str, gas_budget: Decimal, coinIds: List[Coin]):
+        coins = []
+        for coin in coinIds:
+            coins.append(coin.coinObjectId)
         payload = {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "unsafe_payAllSui",
             "params": [
                 address,
-                coinIds,
+                coins,
                 [recipient],
                 round(gas_budget * 10**9)
             ]
