@@ -18,7 +18,7 @@ Session = sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
-    autoCommit=False
+    autocommit=False
 )
 
 async def init_db() -> None:
