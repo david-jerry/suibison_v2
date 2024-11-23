@@ -475,5 +475,18 @@ async def update_profile(user: Annotated[User, Depends(get_current_user)], form_
         "referralsLv5": referralsLv5,
     }
 
+@user_router.get(
+    "/matrix-pool",
+    status_code=status.HTTP_200_OK,
+    response_model=Optional[MatrixPoolRead],
+    dependencies=[Depends(get_current_user)],
+    description="Returns the current matrix pool"
+)
+async def get_active_matrix_pool(user: Annotated[User, Depends(get_current_user)], session: session):
+    now = datetime.now()
+    mp_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+    matrix = mp_db.first()
+    return matrix
+
 
 

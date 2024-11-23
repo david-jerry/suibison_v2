@@ -398,8 +398,8 @@ class MatrixUsersRead(BaseModel):
     uid: uuid.UUID
     matrixPoolUid: uuid.UUID
     userId: str
-    referralsAddes: int
-    matrixearning: Decimal
+    referralsAdded: int
+    matrixEarning: Decimal
     matrixShare: Decimal
 
 
