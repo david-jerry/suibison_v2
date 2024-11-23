@@ -242,8 +242,8 @@ class UserServices:
             )
             session.add(new_referral)
             session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=referrer.uid))
-            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
             await session.commit()
+            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
             
             
             # ###### ADD FAST ADD BONUS FOR THE FIRST REFERRING USER
