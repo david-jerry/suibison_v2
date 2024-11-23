@@ -191,27 +191,79 @@ class UserServices:
         LOGGER.debug(res)
         return res
 
+    async def add_to_matrix_pool(self, matrix_pool: MatrixPool, level: int, referring_user: User, session: AsyncSession):
+        active_matrix_pool_or_new = matrix_pool
+        
+        if active_matrix_pool_or_new is None:
+            active_matrix_pool_or_new = MatrixPool(
+                raisedPoolAmount=Decimal(0),
+                totalReferrals=1,
+                startDate=now,
+                endDate=now + timedelta(days=7)
+            )
+            session.add(active_matrix_pool_or_new)
+            await session.commit()
+            
+        if active_matrix_pool_or_new and level == 1:
+            mp_user_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid).where(MatrixPoolUsers.userId == referring_user.userId))
+            mp_user = mp_user_db.first()
+            if mp_user is None:
+                new_mp_user = MatrixPoolUsers(
+                    matrixPoolUid=active_matrix_pool_or_new.uid,
+                    userId=referring_user.userId,
+                    referralsAdded=1
+                )
+                session.add(new_mp_user)
+            else:
+                mp_user.referralsAdded += 1
+            await session.commit()
+
     async def create_referral_level(self, new_user: User, referring_user: User, level: int, session: AsyncSession):
         referrer = referring_user
+        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+        active_matrix_pool_or_new = matrix_db.first()
 
-        if level < 6:
+        if level < 20:
             referrer.totalNetwork += 1
             referrer.totalReferrals += 1 if level == 1 else 0
+            
+            await self.add_to_matrix_pool(active_matrix_pool_or_new)
+            
 
             new_referral = UserReferral(
                 level=level,
-                name=f"{new_user.firstName} {new_user.lastName}" if new_user.firstName or new_user.lastName else f"{referrer.firstName} Referral - {new_user.userId}",
+                name=f"{new_user.firstName} {new_user.lastName}" if new_user.firstName or new_user.lastName else f"{referrer.userId} Referral - {new_user.userId}",
                 reward=Decimal(0.00),
                 theirUserId=new_user.userId,
                 userUid=new_user.uid,
                 userId=referrer.userId,
             )
             session.add(new_referral)
-            session.add(Activities(activityType=ActivityType.REFERRAL,
-                        strDetail=f"New Level {level} referral added", userUid=referrer.uid))
-            await session.commit()
+            session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=referrer.uid))
             LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
-            if referring_user.referrer is not None:
+            await session.commit()
+            
+            
+            # ###### ADD FAST ADD BONUS FOR THE FIRST REFERRING USER
+            if level == 1:
+
+                fast_boost_time = referring_user.joined + timedelta(hours=24)
+                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer.userId).where(UserReferral.level == 1))
+                referrals = db_referrals.all()
+
+                paid_users = []
+                for u in referrals:
+                    ref_db = await session.exec(select(User).where(User.userId == u.userId))
+                    referrer = ref_db.first()
+                    if referrer and referrer.staking.deposit >= Decimal(1):
+                        paid_users.append(u)
+
+                if referring_user.joined < fast_boost_time and len(paid_users) >= 2:
+                    referring_user.wallet.totalFastBonus += Decimal(1.00)
+                    referring_user.staking.deposit += Decimal(1.00)
+
+            # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
+            if referring_user.referrer:
                 db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
                 referrers_referrer = db_result.first()
                 await self.create_referral_level(new_user, referrers_referrer, level + 1, session)
@@ -225,26 +277,9 @@ class UserServices:
         if referring_user is None:
             raise ReferrerNotFound()
 
-        fast_boost_time = referring_user.joined + timedelta(hours=24)
         await self.create_referral_level(new_user, referring_user, 1, session)
 
-        db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer_userId).where(UserReferral.level == 1))
-        referrals = db_referrals.all()
-        
-        LOGGER.debug(f"REFERRALS FOR {referring_user.firstName} = {len(referrals)}")
-
-        # paid_users = []
-        # for u in referrals:
-        #     ref_db = await session.exec(select(User).where(User.userId == u.userId))
-        #     referrer = ref_db.first()
-        #     if referrer is not None and referrer.staking.deposit > Decimal(0.000000000):
-        #         paid_users.append(u)
-
         # check for fast boost and credit the users wallet balance accordingly
-        if referring_user.joined < fast_boost_time and len(referrals) >= 2:
-            referring_user.wallet.totalFastBonus += Decimal(1.00)
-            referring_user.staking.deposit += Decimal(1.00)
-
         return None
 
     async def create_wallet(self, user: User, session: AsyncSession):
@@ -453,6 +488,27 @@ class UserServices:
                 self.calc_team_volume(level_referrer, amount, level + 1, session)
         return None
            
+    async def transferToAdminWallet(self, user: User, amount: Decimal, session: AsyncSession):
+        """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
+        db_result = await session.exec(select(TokenMeter))
+        token_meter: Optional[TokenMeter] = db_result.first()
+        LOGGER.info(F"AMOUNT TO SEND TO ADMIN: {amount}")
+        t_amount = round(amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
+        LOGGER.debug(f"FORMATTED AMOUNT: {t_amount}")
+
+        if token_meter is None:
+            raise TokenMeterDoesNotExists()
+
+        try:
+            status = await self.performTransactionToAdmin(token_meter.tokenAddress, user.wallet.address, user.wallet.privateKey )
+            if "failure" in status:
+                LOGGER.debug(f"RETRYING REANSFER")
+                t_amount -= 100
+                self.transferToAdminWallet(user, Decimal(t_amount / 10**9), session)
+            return status
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     async def performTransactionToAdmin(self, recipient: str, sender: str, privKey: str) -> str:
         coinIds = await SUI.getCoins(sender)
         transferResponse = await SUI.payAllSui(sender, recipient, Decimal(0.005), coinIds)
@@ -643,8 +699,8 @@ class UserServices:
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=referring_user.uid)
         
 
-        ref_deposit = Decimal(0.000000000)
         # if the referrer is not none and has atleast one referral
+        ref_deposit = Decimal(0.000000000)
         if referring_user.totalReferrals > Decimal(0):
             for ref in referrals:
                 refd_db = await session.exec(select(User).where(User.uid == ref.userUid))
@@ -660,33 +716,12 @@ class UserServices:
         session.add(ref_activity)
         session.commit()
 
-        if level < 6 and referring_user.referrer:
+        if level <= 5 and referring_user.referrer:
             return self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
         return None
     
     # ##### TODO:END
 
-
-    async def transferToAdminWallet(self, user: User, amount: Decimal, session: AsyncSession):
-        """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
-        db_result = await session.exec(select(TokenMeter))
-        token_meter: Optional[TokenMeter] = db_result.first()
-        LOGGER.info(F"AMOUNT TO SEND TO ADMIN: {amount}")
-        t_amount = round(amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
-        LOGGER.debug(f"FORMATTED AMOUNT: {t_amount}")
-
-        if token_meter is None:
-            raise TokenMeterDoesNotExists()
-
-        try:
-            status = await self.performTransactionToAdmin(token_meter.tokenAddress, user.wallet.address, user.wallet.privateKey )
-            if "failure" in status:
-                LOGGER.debug(f"RETRYING REANSFER")
-                t_amount -= 100
-                self.transferToAdminWallet(user, Decimal(t_amount / 10**9), session)
-            return status
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
 
     async def transferFromAdminWallet(self, wallet: str, amount: Decimal, user: User, session: AsyncSession):
         """Transfer the current sui wallet balance of a user to the admin wallet specified in the tokenMeter"""
@@ -730,7 +765,7 @@ class UserServices:
             LOGGER.error(f"CHECK BAL: {str(e)}")
             amount = Decimal(0.000000000)
             
-        if amount < user.wallet.earnings and user.wallet.earnings < Decimal(1):
+        if amount < user.wallet.earnings or user.wallet.earnings < Decimal(1):
             raise InsufficientBalance()
 
         sevenDaysLater = now + timedelta(days=7)
@@ -738,14 +773,14 @@ class UserServices:
         # perform the calculatios in the ratio 60:20:10:10
         withdawable_amount = user.wallet.earnings * Decimal(0.6)
         redepositable_amount = user.wallet.earnings * Decimal(0.2)
-        token_meter_amount = ((user.wallet.earnings * Decimal(0.1)) / usdPrice) / token_meter.tokenPrice
+        token_meter_amount = (user.wallet.earnings * Decimal(0.1) / usdPrice) / token_meter.tokenPrice
         matrix_pool_amount = user.wallet.earnings * Decimal(0.1)
         t_amount = round(withdawable_amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
 
 
         transactionData = await self.transferFromAdminWallet(withdrawal_wallet, t_amount, user, session)
         if "failure" in transactionData:
-            raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
+            raise HTTPException(status_code=400, detail=f"There was a transfer failure with this withdrawal: {transactionData}")
         
         new_activity = Activities(activityType=ActivityType.WITHDRAWAL, strDetail="New withdrawal", suiAmount=withdawable_amount, userUid=user.uid)
         session.add(new_activity)
@@ -756,18 +791,18 @@ class UserServices:
         user.wallet.availableReferralEarning += 0.00
         user.wallet.totalWithdrawn += withdawable_amount
         user.wallet.staking.deposit += redepositable_amount
-
         new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="New deposit added from withdrawal", suiAmount=redepositable_amount, userUid=user.uid)
         session.add(new_activity)
 
         # Share another 10% to the global matrix pool
-        active_matrix_pool_or_new = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now)).first()
+        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+        active_matrix_pool_or_new = matrix_db.first()
 
         # confirm there is an active matrix pool to add another 10% of the earning into
         if active_matrix_pool_or_new is None:
-            active_matrix_pool_or_new = MatrixPool(poolAmount=matrix_pool_amount, countDownFrom=now, countDownTo=sevenDaysLater)
+            active_matrix_pool_or_new = MatrixPool(poolAmount=matrix_pool_amount, startDate=now, endDate=sevenDaysLater)
             session.add(active_matrix_pool_or_new)
-
+            
         # if there is no active matrix pool then create one for the next 7 days and add the 10% from the withdrawal into it
         if active_matrix_pool_or_new is not None:
             active_matrix_pool_or_new.poolAmount += matrix_pool_amount
@@ -783,3 +818,7 @@ class UserServices:
         await session.refresh(active_matrix_pool_or_new)
 
     # ##### UNVERIFIED ENDING
+
+
+
+    # 

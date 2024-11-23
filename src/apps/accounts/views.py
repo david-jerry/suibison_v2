@@ -299,7 +299,7 @@ async def delete_a_user(userId: str, session: session):
         
     if user.referrer:
         await session.delete(user.referrer)
-        
+                
     for ctivity in user.activities:
         await session.delete(ctivity)
         

@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from decimal import Decimal
 import pprint
-from typing import Annotated
+from typing import Annotated, List, Optional
 from celery import shared_task
 from fastapi import Depends
 
@@ -12,7 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 import ast
 
-from src.apps.accounts.models import TokenMeter, User, UserReferral, UserStaking, UserWallet
+from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
 import yfinance as yf
 
 from src.apps.accounts.services import UserServices
@@ -20,7 +20,7 @@ from src.celery_tasks import celery_app
 from src.db import engine
 from src.db.engine import get_session, get_session_context
 from src.db.redis import redis_client
-from src.utils.calculations import get_rank
+from src.utils.calculations import get_rank, matrix_share
 from src.utils.logger import LOGGER
 from sqlmodel import select
 
@@ -48,6 +48,13 @@ def run_calculate_daily_tasks():
     loop.run_until_complete(calculate_daily_tasks())
     loop.close()
 
+@celery_app.task(name="run_create_matrix_pool")
+def run_create_matrix_pool():    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(create_matrix_pool())
+    loop.close()
+
 
 
 async def fetch_sui_price():
@@ -57,6 +64,7 @@ async def fetch_sui_price():
     await redis_client.set("sui_price", rate)
     
 async def fetch_sui_balance():
+    now = datetime.now()
     async with get_session_context() as session:
         user_db = await session.exec(select(User).where(User.isBlocked == False))
         users = user_db.all()
@@ -64,11 +72,26 @@ async def fetch_sui_balance():
         for user in users:
             await user_services.stake_sui(user, session)
 
+        # ###### CALCULATE USERS SHARE TO AN ACTIVE POOL
+        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+        active_matrix_pool_or_new: Optional[MatrixPool] = matrix_db.first()
+        
+        if active_matrix_pool_or_new:
+            mp_users_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid))
+            mp_users = mp_users_db.all()
+            
+            for mp_user in mp_users:
+                percentage, earning = await matrix_share(mp_user)
+                mp_user.matrixShare = percentage
+                mp_user.matrixEarning = earning
+                await session.commit()
+                await session.refresh(mp_user)
+        
 async def calculate_daily_tasks():
     now = datetime.now()
     async with get_session_context() as session:
         user_db = await session.exec(select(User).where(User.isBlocked == False))
-        users = user_db.all()
+        users: List[User] = user_db.all()
         
         for user in users:
             # ######### CALCULATTE RANK EARNING ########## #
@@ -81,6 +104,7 @@ async def calculate_daily_tasks():
             
             if user.rank != rank:
                 user.rank = rank
+                
             user.wallet.weeklyRankEarnings = rankErning
             if now.date() == user.lastRankEarningAddedAt.date():
                 user.wallet.earnings += Decimal(user.wallet.weeklyRankEarnings)
@@ -113,13 +137,27 @@ async def calculate_daily_tasks():
                 stake.roi = Decimal(0)
                 stake.end = None
                 stake.nextRoiIncrease = None
-
+                
+                
 
             # session.add(user)
             await session.commit()
             await session.refresh(user)
 
-
+async def create_matrix_pool():
+    now = datetime.now()
+    async with get_session_context() as session:
+        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+        active_matrix_pool_or_new = matrix_db.first()
+        sevenDaysLater = now + timedelta(days=7)
+        
+        if active_matrix_pool_or_new is None:
+            new_pool = MatrixPool(
+                poolAmount=Decimal(0), startDate=now, endDate=sevenDaysLater
+            )
+            session.add(new_pool)
+            await session.commit()
+            
 
 
 

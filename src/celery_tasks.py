@@ -49,6 +49,11 @@ celery_app.conf.beat_schedule = {
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
         'schedule': 60 * 7
+    },
+    # mondays
+    'run_create_matrix_pool': {
+        'task': 'run_create_matrix_pool',
+        'schedule': crontab(day_of_week="mon")
     }
 }
 
