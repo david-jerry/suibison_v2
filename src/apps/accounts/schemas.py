@@ -399,7 +399,7 @@ class MatrixUsersRead(BaseModel):
     matrixPoolUid: uuid.UUID
     userId: str
     referralsAdded: int
-    matrixEarning: Decimal
+    matrixEarninig: Decimal
     matrixShare: Decimal
 
 
