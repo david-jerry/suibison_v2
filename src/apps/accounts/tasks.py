@@ -55,6 +55,13 @@ def run_create_matrix_pool():
     loop.run_until_complete(create_matrix_pool())
     loop.close()
 
+@celery_app.task(name="run_calculate_users_matrix_pool_share")
+def run_calculate_users_matrix_pool_share():    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(calculate_users_matrix_pool_share())
+    loop.close()
+
 
 
 async def fetch_sui_price():
@@ -72,18 +79,30 @@ async def fetch_sui_balance():
         for user in users:
             await user_services.stake_sui(user, session)
 
+async def calculate_users_matrix_pool_share():
+    now = datetime.now()
+    async with get_session_context() as session:
         # ###### CALCULATE USERS SHARE TO AN ACTIVE POOL
         matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
         active_matrix_pool_or_new: Optional[MatrixPool] = matrix_db.first()
         
         if active_matrix_pool_or_new:
+            payoutTime = active_matrix_pool_or_new.endDate + timedelta(minutes=30)
             mp_users_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid))
-            mp_users = mp_users_db.all()
+            mp_users: List[MatrixPoolUsers] = mp_users_db.all()
             
             for mp_user in mp_users:
                 percentage, earning = await matrix_share(mp_user)
                 mp_user.matrixShare = percentage
                 mp_user.matrixEarning = earning
+                if active_matrix_pool_or_new.endDate <= payoutTime:
+                    mpu_db = await session.exec(select(User).where(User.userId == mp_user.userId))
+                    mpu: Optional[User] = mpu_db.first()
+                    
+                    mpu.wallet.earnings += earning
+                    mpu.wallet.availableReferralEarning += earning
+                    mpu.wallet.totalReferralEarnings += earning
+                    
                 await session.commit()
                 await session.refresh(mp_user)
         

@@ -40,20 +40,21 @@ celery_app.conf.beat_schedule = {
         'task': 'fetch_sui_usd_price_hourly',
         'schedule': 60 * 5,
     },
-    # 24 hours
     'run_calculate_daily_tasks': {
         'task': 'run_calculate_daily_tasks',
         'schedule': 60 * 60 * 24
     },
-    # 15 minutes
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
         'schedule': 60 * 7
     },
-    # mondays
     'run_create_matrix_pool': {
         'task': 'run_create_matrix_pool',
         'schedule': crontab(day_of_week="mon")
+    },
+    'run_calculate_users_matrix_pool_share': {
+        'task': 'run_calculate_users_matrix_pool_share',
+        'schedule': 60 * 30
     }
 }
 

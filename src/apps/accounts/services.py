@@ -207,6 +207,8 @@ class UserServices:
         if active_matrix_pool_or_new and level == 1:
             mp_user_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid).where(MatrixPoolUsers.userId == referring_user.userId))
             mp_user = mp_user_db.first()
+            active_matrix_pool_or_new.totalReferrals += 1
+            
             if mp_user is None:
                 new_mp_user = MatrixPoolUsers(
                     matrixPoolUid=active_matrix_pool_or_new.uid,
