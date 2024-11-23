@@ -191,50 +191,20 @@ class UserServices:
         LOGGER.debug(res)
         return res
 
-    async def add_to_matrix_pool(self, matrix_pool: MatrixPool, level: int, referring_user: User, session: AsyncSession):
-        active_matrix_pool_or_new = matrix_pool
-        
-        if active_matrix_pool_or_new is None:
-            active_matrix_pool_or_new = MatrixPool(
-                raisedPoolAmount=Decimal(0),
-                totalReferrals=1,
-                startDate=now,
-                endDate=now + timedelta(days=7)
-            )
-            session.add(active_matrix_pool_or_new)
-            await session.commit()
-            
-        if active_matrix_pool_or_new and level == 1:
-            mp_user_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid).where(MatrixPoolUsers.userId == referring_user.userId))
-            mp_user = mp_user_db.first()
-            active_matrix_pool_or_new.totalReferrals += 1
-            
-            if mp_user is None:
-                new_mp_user = MatrixPoolUsers(
-                    matrixPoolUid=active_matrix_pool_or_new.uid,
-                    userId=referring_user.userId,
-                    referralsAdded=1
-                )
-                session.add(new_mp_user)
-            else:
-                mp_user.referralsAdded += 1
-            await session.commit()
-
     async def create_referral_level(self, new_user: User, referring_user: User, level: int, session: AsyncSession):
         referrer = referring_user
-        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
-        active_matrix_pool_or_new = matrix_db.first()
-
         if level < 20:
             referrer.totalNetwork += 1
-            referrer.totalReferrals += 1 if level == 1 else 0
+            referrer.totalReferrals += 1 if level == 1 else 0       
             
-            await self.add_to_matrix_pool(active_matrix_pool_or_new, level, referring_user, session)
-            
+            name = f"{referring_user.userId} Referral"
+            if new_user.firstName:
+                name = f"{new_user.firstName}"
+                
 
             new_referral = UserReferral(
                 level=level,
-                name=f"{new_user.firstName} {new_user.lastName}" if new_user.firstName or new_user.lastName else f"{referrer.userId} Referral - {new_user.userId}",
+                name=name,
                 reward=Decimal(0.00),
                 theirUserId=new_user.userId,
                 userUid=new_user.uid,
@@ -243,14 +213,16 @@ class UserServices:
             session.add(new_referral)
             session.add(Activities(activityType=ActivityType.REFERRAL, strDetail=f"New Level {level} referral added", userUid=referrer.uid))
             await session.commit()
-            LOGGER.debug(f"New Referral for {referrer.userId}: {pprint.pprint(new_referral, indent=4, depth=4)}")
+            
+            if new_referral is not None:
+                LOGGER.debug(f"New Referral for {referrer.userId}: {new_referral.name}")
             
             
             # ###### ADD FAST ADD BONUS FOR THE FIRST REFERRING USER
             if level == 1:
 
                 fast_boost_time = referring_user.joined + timedelta(hours=24)
-                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referrer.userId).where(UserReferral.level == 1))
+                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referring_user.userId).where(UserReferral.level == 1))
                 referrals = db_referrals.all()
 
                 paid_users = []
@@ -265,6 +237,7 @@ class UserServices:
                     referring_user.staking.deposit += Decimal(1.00)
 
             # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
+            
             if referring_user.referrer:
                 db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
                 referrers_referrer = db_result.first()
@@ -278,6 +251,35 @@ class UserServices:
         # Save the referral level down to the 5th level in redis for improved performance
         if referring_user is None:
             raise ReferrerNotFound()
+
+        matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
+        active_matrix_pool_or_new = matrix_db.first()
+        
+        if active_matrix_pool_or_new is None:
+            active_matrix_pool_or_new = MatrixPool(
+                totalReferrals=1,
+                startDate=now,
+                endDate=now + timedelta(days=7)
+            )
+            session.add(active_matrix_pool_or_new)
+            await session.commit()
+        else:
+            active_matrix_pool_or_new.totalReferrals += 1
+
+        mp_user_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == active_matrix_pool_or_new.uid).where(MatrixPoolUsers.userId == referrer_userId))
+        mp_user = mp_user_db.first()
+        
+        if mp_user is None:
+            new_mp_user = MatrixPoolUsers(
+                matrixPoolUid=active_matrix_pool_or_new.uid,
+                userId=referrer_userId,
+                referralsAdded=1
+            )
+            session.add(new_mp_user)
+        else:
+            mp_user.referralsAdded += 1
+            
+        await session.commit()
 
         await self.create_referral_level(new_user, referring_user, 1, session)
 

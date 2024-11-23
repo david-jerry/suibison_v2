@@ -1,8 +1,6 @@
 from datetime import datetime, timedelta
 import hmac
 import hashlib
-import pprint
-from typing import Optional
 import urllib.parse
 import uuid
 from passlib.context import CryptContext
