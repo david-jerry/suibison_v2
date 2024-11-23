@@ -309,6 +309,9 @@ class UserServices:
 
     async def authenticate_user(self, form_data: AdminLogin, session):
         user = await user_exists_check(form_data.userId, session)
+        
+        if user is None:
+            raise UserNotFound()
 
         valid_password = verifyHashKey(form_data.password, user.passwordHash)
         if not valid_password:
