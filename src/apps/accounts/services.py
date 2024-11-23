@@ -227,7 +227,7 @@ class UserServices:
             referrer.totalNetwork += 1
             referrer.totalReferrals += 1 if level == 1 else 0
             
-            await self.add_to_matrix_pool(active_matrix_pool_or_new)
+            await self.add_to_matrix_pool(active_matrix_pool_or_new, level, referring_user, session)
             
 
             new_referral = UserReferral(
