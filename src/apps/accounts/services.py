@@ -778,7 +778,7 @@ class UserServices:
         # perform the calculatios in the ratio 60:20:10:10
         withdawable_amount = user.wallet.earnings * Decimal(0.6)
         redepositable_amount = user.wallet.earnings * Decimal(0.2)
-        token_meter_amount = (user.wallet.earnings * Decimal(0.1) / usdPrice) / token_meter.tokenPrice
+        token_meter_amount = ((user.wallet.earnings * Decimal(0.1)) / usdPrice) / token_meter.tokenPrice
         matrix_pool_amount = user.wallet.earnings * Decimal(0.1)
         t_amount = round(withdawable_amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
 
