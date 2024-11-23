@@ -481,7 +481,7 @@ class UserServices:
         usd = await get_sui_usd_price()
         sui_purchased = amount_in_sui * usd
         token_worth_in_usd_purchased = sui_purchased / tokenPrice
-        user.wallet.totalTokenPurchased += token_worth_in_usd_purchased / usd
+        user.wallet.totalTokenPurchased += token_worth_in_usd_purchased
         return None
     
     async def calc_team_volume(self, referrer: User, amount: Decimal, level: int, session: AsyncSession):
@@ -538,8 +538,8 @@ class UserServices:
         """Core logic for handling the staking process."""
         if Decimal(0.000000000) < amount:
             
-            amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
-            sbt_amount = Decimal(amount * Decimal(0.1))
+            amount_to_show = amount - Decimal(amount * Decimal(0.1))
+            sbt_amount = amount * Decimal(0.1)
             
             try:
                 transactionData = await self.transferToAdminWallet(user, amount, session)
