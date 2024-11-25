@@ -10,7 +10,11 @@ from pydantic_extra_types.country import CountryInfo
 from datetime import date, datetime
 from typing import Optional, List, Annotated
 
+from sqlmodel import select
+
 from src.apps.accounts.enum import ActivityType
+from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, User
+from src.db.engine import get_session_context
 
 
 class Message(BaseModel):
@@ -398,9 +402,47 @@ class MatrixUsersRead(BaseModel):
     uid: uuid.UUID
     matrixPoolUid: uuid.UUID
     userId: str
+    name: str
     referralsAdded: int
     matrixEarninig: Decimal
     matrixShare: Decimal
+    position: int
+    
+    @staticmethod
+    async def calc_position(matrixPoolUser: "MatrixUsersRead"):
+        mpu_position = 1
+        async with get_session_context() as session:
+            p_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == matrixPoolUser.matrixPoolUid).order_by(MatrixPoolUsers.referralsAdded))
+            positions = p_db.all()
+            
+            for p in positions:
+                if p.userId != matrixPoolUser.userId:
+                    mpu_position += 1
+                elif p.userid == matrixPoolUser.userId:
+                    return mpu_position
+
+    @staticmethod
+    async def return_name(matrixPoolUser: "MatrixUsersRead"):
+        async with get_session_context() as session:
+            mp_db = await session.exec(select(User).where(User.userid == matrixPoolUser.userId))
+            mp = mp_db.first()
+            
+            name = matrixPoolUser.userId
+            
+            if mp.firstName:
+                name = mp.firstName
+            elif mp.lastName:
+                name = mp.lastName
+                
+            return name
+            
+
+    @classmethod
+    def fro_orm(cls, pool: "MatrixUsersRead"):
+        pool_dict = pool.model_dump()
+        pool_dict["position"] = cls.calc_position(pool)
+        pool_dict["name"] = cls.return_name(pool)
+        return cls(**pool_dict)
 
 
 class ActivitiesRead(BaseModel):
