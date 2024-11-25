@@ -31,16 +31,8 @@ session = Annotated[AsyncSession, Depends(get_session)]
 def fetch_sui_usd_price_hourly():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_concurrent_tasks())
-    # loop.run_until_complete(add_fast_bonus())
+    loop.run_until_complete(run_cncurrent_tasks())
     loop.close()
-    
-async def run_concurrent_tasks():
-    async with asyncio.TaskGroup() as group:
-        task1 = group.create_task(fetch_sui_price())
-        task2 = group.create_task(add_fast_bonus())
-
-    await group
     
 @celery_app.task(name="check_and_update_balances")
 def check_and_update_balances():
@@ -71,6 +63,12 @@ def run_calculate_users_matrix_pool_share():
     loop.close()
 
 
+async def run_cncurrent_tasks():
+    async with asyncio.TaskGroup() as group:
+        task1 = group.create_task(fetch_sui_price())
+        task2 = group.create_task(add_fast_bonus())
+
+    await group
 
 async def fetch_sui_price():
     sui = yf.Ticker("SUI20947-USD")
@@ -141,34 +139,7 @@ async def calculate_daily_tasks():
                 user.lastRankEarningAddedAt = now + timedelta(days=7)
                 
                 
-async def add_fast_bonus():
-    now = datetime.now()
-    async with get_session_context() as session:
-        user_db = await session.exec(select(User).where(User.isBlocked == False))
-        users: List[User] = user_db.all()
-
-        for user in users:
-            ref_db = await session.exec(select(UserReferral).where(UserReferral.userId == user.userId))
-            refs: List[UserReferral] = ref_db.all()
-            
-            if refs.level == 1:
-                fast_boost_time = user.joined + timedelta(hours=24)
-                # db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referring_user.userId).where(UserReferral.level == 1))
-                # referrals = db_referrals.all()
-
-                paid_users = []
-                for u in refs:
-                    ref_db = await session.exec(select(User).where(User.userId == u.userId))
-                    referrer = ref_db.first()
-                    if referrer and referrer.staking.deposit >= Decimal(1):
-                        paid_users.append(u)
-
-                if user.joined < fast_boost_time and len(paid_users) >= 2:
-                    user.wallet.totalFastBonus += Decimal(1.00)
-                    user.staking.deposit += Decimal(1.00)
-
-            # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
-
+                
                 
                 
                 
@@ -213,6 +184,33 @@ async def create_matrix_pool():
             await session.commit()
             
 
+async def add_fast_bonus():
+    now = datetime.now()
+    async with get_session_context() as session:
+        user_db = await session.exec(select(User).where(User.isBlocked == False))
+        users: List[User] = user_db.all()
+
+        for user in users:
+            ref_db = await session.exec(select(UserReferral).where(UserReferral.userId == user.userId))
+            refs: List[UserReferral] = ref_db.all()
+            
+            if refs.level == 1:
+                fast_boost_time = user.joined + timedelta(hours=24)
+                # db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referring_user.userId).where(UserReferral.level == 1))
+                # referrals = db_referrals.all()
+
+                paid_users = []
+                for u in refs:
+                    ref_db = await session.exec(select(User).where(User.userId == u.userId))
+                    referrer = ref_db.first()
+                    if referrer and referrer.staking.deposit >= Decimal(1):
+                        paid_users.append(u)
+
+                if user.joined < fast_boost_time and len(paid_users) >= 2:
+                    user.wallet.totalFastBonus += Decimal(1.00)
+                    user.staking.deposit += Decimal(1.00)
+
+            # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
 
 
 
