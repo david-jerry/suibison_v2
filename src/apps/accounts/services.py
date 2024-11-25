@@ -238,10 +238,11 @@ class UserServices:
 
             # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
             
-            if referring_user.referrer:
+            if referring_user.referrer is not None:
                 db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
                 referrers_referrer = db_result.first()
-                await self.create_referral_level(new_user, referrers_referrer, level + 1, session)
+                new_level = level + 1
+                await self.create_referral_level(new_user, referrers_referrer, new_level, session)
         return None
 
     async def create_referrer(self, referrer_userId: Optional[str], new_user: User, session: AsyncSession):
@@ -273,11 +274,13 @@ class UserServices:
             new_mp_user = MatrixPoolUsers(
                 matrixPoolUid=active_matrix_pool_or_new.uid,
                 userId=referrer_userId,
-                referralsAdded=1
+                referralsAdded=1,
+                matrixShare=1,
             )
             session.add(new_mp_user)
         else:
             mp_user.referralsAdded += 1
+            mp_user.matrixShare += 1
             
         await session.commit()
 
