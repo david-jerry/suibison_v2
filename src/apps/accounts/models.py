@@ -82,6 +82,7 @@ class User(SQLModel, table=True):
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
     )
+    referrer_id: uuid.UUID = Field(nullable=True, foreign_key="users.uid")
 
     # Activities
     activities: List["Activities"] = Relationship(
@@ -100,7 +101,7 @@ class User(SQLModel, table=True):
         back_populates="user",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "selectin"}
     )
-    
+
     # failed transactions
     pendingTransactions: List["PendingTransactions"] = Relationship(
         back_populates="user",
@@ -112,8 +113,6 @@ class User(SQLModel, table=True):
                                              nullable=False, description="Last earning calculation timestamp")
     updatedAt: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(
         pg.TIMESTAMP, nullable=False, onupdate=datetime.utcnow), description="Record last update timestamp")
-    
-    
 
     def __repr__(self) -> str:
         return f"<User {self.userId}>"
@@ -145,7 +144,7 @@ class UserReferral(SQLModel, table=True):
 
 class UserWallet(SQLModel, table=True):
     """
-    Wallet to hold all financial records of the user, wallet address and private 
+    Wallet to hold all financial records of the user, wallet address and private
     key for the admins to automatically transfer funds from the user's wallet into
     the project owners wallet address for withdrawals and disursement.
     """
@@ -196,9 +195,7 @@ class PendingTransactions(SQLModel, table=True):
             pg.UUID, primary_key=True, unique=True, nullable=False, default=uuid.uuid4
         )
     )
-    
     amount: Decimal = Field(decimal_places=9, default=0.00)
-    
     # Foreign Key to User
     userUid: Optional[uuid.UUID] = Field(default=None, nullable=True, foreign_key="users.uid")
     user: Optional[User] = Relationship(back_populates="pendingTransactions")
@@ -229,7 +226,7 @@ class UserStaking(SQLModel, table=True):
     start: datetime = Field(
         sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
     )
-    
+
     end: Optional[datetime] = Field(
         sa_column=Column(pg.TIMESTAMP, default=None, nullable=True),
     )
@@ -243,9 +240,9 @@ class UserStaking(SQLModel, table=True):
 
 class MatrixPool(SQLModel, table=True):
     """
-    This takes from the user withdrawals and only when the user has made a direct 
-    referral before they qualify to have a share in the matrix pool and based on 
-    their share the money would be withdrawn into their earnings balance for them 
+    This takes from the user withdrawals and only when the user has made a direct
+    referral before they qualify to have a share in the matrix pool and based on
+    their share the money would be withdrawn into their earnings balance for them
     to withdraw whenever they desire.
     """
     __tablename__ = "matrix_pool"
@@ -279,7 +276,7 @@ class MatrixPool(SQLModel, table=True):
 
 class MatrixPoolUsers(SQLModel, table=True):
     """
-    For every matrix pool run users who purchase the share by adding their referrals 
+    For every matrix pool run users who purchase the share by adding their referrals
     gets instant stakes to the claims here
     """
     __tablename__ = "matrix_users"

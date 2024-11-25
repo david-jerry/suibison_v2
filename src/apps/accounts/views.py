@@ -46,7 +46,7 @@ async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: 
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     LOGGER.debug(referralsLv2List.all())
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
@@ -62,9 +62,9 @@ async def start(form_data: Annotated[UserCreateOrLoginSchema, Body()], session: 
         "referralsLv5": referralsLv5
     }
     return {
-        "message": "Authorization Successful", 
-        "accessToken": accessToken, 
-        "refreshToken": refershToken, 
+        "message": "Authorization Successful",
+        "accessToken": accessToken,
+        "refreshToken": refershToken,
         "user": userResp
     }
 
@@ -82,7 +82,7 @@ async def login(form_data: Annotated[UserLoginSchema, Body()], session: session)
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     LOGGER.debug(referralsLv2List.all())
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
@@ -98,9 +98,9 @@ async def login(form_data: Annotated[UserLoginSchema, Body()], session: session)
         "referralsLv5": referralsLv5
     }
     return {
-        "message": "Authorization Successful", 
-        "accessToken": accessToken, 
-        "refreshToken": refershToken, 
+        "message": "Authorization Successful",
+        "accessToken": accessToken,
+        "refreshToken": refershToken,
         "user": userResp
     }
 
@@ -117,7 +117,7 @@ async def admin_login(request: Request, form_data: Annotated[AdminLogin, Body(..
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
@@ -133,9 +133,9 @@ async def admin_login(request: Request, form_data: Annotated[AdminLogin, Body(..
         "referralsLv5": referralsLv5
     }
     return {
-        "message": "Authorization Successful", 
-        "accessToken": accessToken, 
-        "refreshToken": refershToken, 
+        "message": "Authorization Successful",
+        "accessToken": accessToken,
+        "refreshToken": refershToken,
         "user": userResp
     }
 
@@ -148,10 +148,10 @@ async def admin_login(request: Request, form_data: Annotated[AdminLogin, Body(..
 async def refresh_access_token(token: Annotated[User, Depends(RefreshTokenBearer())], session: session):
     expiry_timestamp = token["exp"]
     userId = token["user"]["userId"]
-    
+
     if datetime.fromtimestamp(expiry_timestamp).date() < datetime.now().date():
         raise InvalidToken()
-    
+
     res_user = await user_service.return_user_by_userId(userId, session)
     new_access_token = createAccessToken(user_data=token["user"])
     return {
@@ -256,7 +256,7 @@ async def get_a_user(userId: str, session: session):
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
@@ -264,7 +264,7 @@ async def get_a_user(userId: str, session: session):
     referralsLv5 = referralsLv5List.all()
 
     return {
-        "user": user, 
+        "user": user,
         "referralsLv1": referralsLv1,
         "referralsLv2": referralsLv2,
         "referralsLv3": referralsLv3,
@@ -286,29 +286,29 @@ async def delete_a_user(userId: str, session: session):
     all_pool = db_pool_users.all()
     ref_db = await session.exec(select(User).where(User.userId == user.referrer.userId))
     referrer = ref_db.first()
-    
+
     if referrer is not None:
         referrer.totalNetwork -= 1
         referrer.totalReferrals -= 1
-    
+
     if user.wallet:
-        await session.delete(user.wallet) 
-    
+        await session.delete(user.wallet)
+
     if user.staking:
         await session.delete(user.staking)
-        
+
     if user.referrer:
         await session.delete(user.referrer)
-                
+
     for ctivity in user.activities:
         await session.delete(ctivity)
-        
+
     for pu in all_pool:
         await session.delete(pu)
-        
+
     for pt in user.pendingTransactions:
         await session.delete(pt)
-    
+
     await session.delete(user)
     await session.commit()
 
@@ -333,15 +333,15 @@ async def update_profile(userId: str, form_data: Annotated[UserUpdateSchema, Bod
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
     referralsLv4 = referralsLv4List.all()
     referralsLv5 = referralsLv5List.all()
-    
+
     return {
-        "user": res_user, 
+        "user": res_user,
         "referralsLv1": referralsLv1,
         "referralsLv2": referralsLv2,
         "referralsLv3": referralsLv3,
@@ -364,7 +364,7 @@ async def get_sui_rate():
     return {
         "rate": rate
     }
-    
+
 @user_router.get(
     "/token-meter",
     status_code=status.HTTP_200_OK,
@@ -384,26 +384,40 @@ async def get_token_meter(session: session):
 )
 async def me(user: Annotated[User, Depends(get_current_user)], session: session):
     LOGGER.debug(f"user: {user}")
+
     referralsLv1List = await session.exec(statement = select(UserReferral).where(UserReferral.level == 1).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv2List = await session.exec(statement = select(UserReferral).where(UserReferral.level == 2).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv3List = await session.exec(statement = select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv4List = await session.exec(statement = select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(statement = select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
     referralsLv4 = referralsLv4List.all()
     referralsLv5 = referralsLv5List.all()
-    
+
     return {
-        "user": user, 
+        "user": user,
         "referralsLv1": referralsLv1,
         "referralsLv2": referralsLv2,
         "referralsLv3": referralsLv3,
         "referralsLv4": referralsLv4,
         "referralsLv5": referralsLv5,
     }
+
+@user_router.get(
+    "/referrals",
+    status_code=status.HTTP_200_OK,
+    response_model=Page[UserRead],
+    dependencies=[Depends(get_current_user)],
+    description="Returns a paginated list of all actvities to an admin"
+)
+async def user_referrals(user: Annotated[User, Depends(get_current_user)], session: session, level: int):
+    LOGGER.debug(f"user: {user}")
+    referrals = await user_service.get_user_downlines(user, level, session)
+
+    return paginate(referrals)
 
 @user_router.post(
     "/me/stake",
@@ -412,9 +426,9 @@ async def me(user: Annotated[User, Depends(get_current_user)], session: session)
     dependencies=[Depends(get_current_user)],
     description="Initiates a stake and staarts the countdown to a 100days"
 )
-async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):    
-    await user_service.stake_sui(user, session)    
-    
+async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], session: session):
+    await user_service.stake_sui(user, session)
+
     # staked = await user_service.stake_sui(user, session)
     # message = "Initialized/Toppped a Stake"
     message = "Please go about your activity and whenever the stake has reflected in your wallet balance we shall reflect it."
@@ -430,7 +444,7 @@ async def initiate_a_stake(user: Annotated[User, Depends(get_current_user)], ses
     dependencies=[Depends(get_current_user)],
     description="Initiates a withdrawal from the users earning"
 )
-async def withdraw_from_earning(wallet: Annotated[Withdrawal, Body(...)], user: Annotated[User, Depends(get_current_user)], session: session):    
+async def withdraw_from_earning(wallet: Annotated[Withdrawal, Body(...)], user: Annotated[User, Depends(get_current_user)], session: session):
     await user_service.withdrawToUserWallet(user, wallet, session)
     return "Withdrawal successful"
 
@@ -459,15 +473,15 @@ async def update_profile(user: Annotated[User, Depends(get_current_user)], form_
     referralsLv3List = await session.exec(select(UserReferral).where(UserReferral.level == 3).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv4List = await session.exec(select(UserReferral).where(UserReferral.level == 4).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
     referralsLv5List = await session.exec(select(UserReferral).where(UserReferral.level == 5).where(UserReferral.userId == user.userId).order_by(UserReferral.created).limit(50))
-    
+
     referralsLv1 = referralsLv1List.all()
     referralsLv2 = referralsLv2List.all()
     referralsLv3 = referralsLv3List.all()
     referralsLv4 = referralsLv4List.all()
     referralsLv5 = referralsLv5List.all()
-    
+
     return {
-        "user": res_user, 
+        "user": res_user,
         "referralsLv1": referralsLv1,
         "referralsLv2": referralsLv2,
         "referralsLv3": referralsLv3,
