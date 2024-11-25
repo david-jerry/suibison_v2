@@ -218,25 +218,25 @@ class UserServices:
                 LOGGER.debug(f"New Referral for {referrer.userId}: {new_referral.name}")
             
             
-            # ###### ADD FAST ADD BONUS FOR THE FIRST REFERRING USER
-            if level == 1:
+            # # ###### ADD FAST ADD BONUS FOR THE FIRST REFERRING USER
+            # if level == 1:
 
-                fast_boost_time = referring_user.joined + timedelta(hours=24)
-                db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referring_user.userId).where(UserReferral.level == 1))
-                referrals = db_referrals.all()
+            #     fast_boost_time = referring_user.joined + timedelta(hours=24)
+            #     db_referrals = await session.exec(select(UserReferral).where(UserReferral.userId == referring_user.userId).where(UserReferral.level == 1))
+            #     referrals = db_referrals.all()
 
-                paid_users = []
-                for u in referrals:
-                    ref_db = await session.exec(select(User).where(User.userId == u.userId))
-                    referrer = ref_db.first()
-                    if referrer and referrer.staking.deposit >= Decimal(1):
-                        paid_users.append(u)
+            #     paid_users = []
+            #     for u in referrals:
+            #         ref_db = await session.exec(select(User).where(User.userId == u.userId))
+            #         referrer = ref_db.first()
+            #         if referrer and referrer.staking.deposit >= Decimal(1):
+            #             paid_users.append(u)
 
-                if referring_user.joined < fast_boost_time and len(paid_users) >= 2:
-                    referring_user.wallet.totalFastBonus += Decimal(1.00)
-                    referring_user.staking.deposit += Decimal(1.00)
+            #     if referring_user.joined < fast_boost_time and len(paid_users) >= 2:
+            #         referring_user.wallet.totalFastBonus += Decimal(1.00)
+            #         referring_user.staking.deposit += Decimal(1.00)
 
-            # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
+            # # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
             
             if referring_user.referrer is not None:
                 db_result = await session.exec(select(User).where(User.userId == referring_user.referrer.userId))
