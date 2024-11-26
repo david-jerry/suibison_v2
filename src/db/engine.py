@@ -12,7 +12,7 @@ from src.config.settings import Config
 from src.utils.logger import LOGGER
 
 
-engine = create_async_engine(url=Config.DATABASE_URL, echo=True)
+engine = create_async_engine(url=Config.DATABASE_URL, echo=False)
 Session = sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -26,8 +26,8 @@ async def init_db() -> None:
         raise Exception("Database Engine is None. Please check if you have configured the database url correctly.")
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
-        
-async def get_session() -> AsyncGenerator[AsyncSession,  None]:    
+
+async def get_session() -> AsyncGenerator[AsyncSession,  None]:
     async with Session() as session:
         if session is None:
             raise Exception("Database session is None")
