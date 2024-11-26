@@ -46,7 +46,7 @@ celery_app.conf.beat_schedule = {
     },
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': 60 * 7
+        'schedule': 60
     },
     'run_create_matrix_pool': {
         'task': 'run_create_matrix_pool',
@@ -65,13 +65,13 @@ def setup_periodic_tasks(sender, **kwargs):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run_post_celery_config())
-    
+
 async def run_post_celery_config():
     pass
     # celery_app.add_periodic_task(
     #     schedule=crontab(minute="0", hour="*"),
     #     name="fetch_sui_usd_price_hourly",
-    #     sig=celery_app.signature(name="fetch_sui_usd_price_hourly", varies=True) 
+    #     sig=celery_app.signature(name="fetch_sui_usd_price_hourly", varies=True)
     # ) #fetch_sui_usd_price_hourly.s()
 
     # Session = sessionmaker(
@@ -80,12 +80,12 @@ async def run_post_celery_config():
     #     expire_on_commit=False,
     #     autoflush=False,
     # )
-    
+
     # try:
     #     async with Session() as session:
     #         # await_tasks = await celery_beat.get_periodic_taskks(session)
     #         # tasks = await_tasks
-            
+
     #         # for task in tasks:
     #             # crondict = json.loads(task.crontab)
     #             # celery_app.add_periodic_task(
@@ -99,9 +99,9 @@ async def run_post_celery_config():
     #             #     "schedule": crontab(**crondict),
     #             #     "args": (arg for arg in task.task_args),
     #             # }
-            
+
     #     LOGGER.debug("Periodic tasks configured successful")
     # except Exception as e:
     #     LOGGER.error(f"Error setting the periodic tasks")
-        
-        
+
+
