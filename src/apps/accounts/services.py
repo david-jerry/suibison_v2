@@ -43,6 +43,8 @@ from sui_python_sdk.wallet import SuiWallet
 now = datetime.now()
 celery_beat = TemplateScheduleSQLRepository()
 
+STAKING_MIN = 1
+
 
 class AdminServices:
     async def createTokenRecord(self, form_data: TokenMeterCreate, session: AsyncSession):
@@ -615,18 +617,29 @@ class UserServices:
                 "address": wallet_address
             }
             res = await self.sui_wallet_endpoint(url, body)
-            LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
             balance = Decimal(Decimal(res["balance"]) / 10**9)
+            LOGGER.debug(f"BAl Check: {balance} - {wallet_address}")
             return balance
         except Exception:
             return None
 
+    async def _clear_pending_deposit(self, user: User, pendingBalance: Decimal):
+        user.wallet.balance -= pendingBalance
+        user.wallet.totalDeposit -= pendingBalance
+        user.wallet.pendingBalance = 0
+
     async def _update_user_balance(self, user: User, amount: Decimal, session: AsyncSession):
+        if amount >= STAKING_MIN:
+            if user.wallet.pendingBalance > 0:
+                self._clear_pending_deposit(user, user.wallet.pendingBalance)
+
+        if amount < STAKING_MIN:
+            user.wallet.pendingBalance += amount
+
         user.wallet.totalDeposit += amount
         user.wallet.balance += amount
 
     async def stake_sui(self, user: User, session: AsyncSession):
-        STAKING_MIN = 1
         deposit_amount = await self._get_user_balance(user.wallet.address)
 
         if not deposit_amount:
@@ -636,6 +649,8 @@ class UserServices:
             await self._update_user_balance(user, deposit_amount, session)
 
             if deposit_amount < STAKING_MIN:
+                await session.commit()
+                await session.refresh(user)
                 return
 
             # get ttoken meter details
