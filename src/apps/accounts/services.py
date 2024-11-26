@@ -596,13 +596,11 @@ class UserServices:
                                     strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
 
             session.add(new_activity)
-            await session.commit()
-            await session.refresh(stake)
+
         else:
             new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
                                     suiAmount=amount_to_show, userUid=user.uid)
             session.add(new_activity)
-            await session.commit()
 
         transactionData = await self.transferToAdminWallet(user, amount, session)
         if "failure" in transactionData:
@@ -625,9 +623,6 @@ class UserServices:
         user.wallet.totalDeposit += amount
         user.wallet.balance += amount
 
-        await session.commit()
-        await session.refresh(user)
-
     async def stake_sui(self, user: User, session: AsyncSession):
         STAKING_MIN = 1
         deposit_amount = await self._get_user_balance(user.wallet.address)
@@ -635,7 +630,7 @@ class UserServices:
         if not deposit_amount:
             return
 
-        async with session.begin():
+        try:
             await self._update_user_balance(user, deposit_amount, session)
 
             if deposit_amount < STAKING_MIN:
@@ -673,6 +668,8 @@ class UserServices:
 
             await session.commit()
             await session.refresh(user)
+        except Exception:
+            await session.rollback()
 
     # ##### WORKING ENDPOINT ENDING
 
@@ -748,7 +745,6 @@ class UserServices:
         # End Speed Boost
 
         session.add(ref_activity)
-        session.commit()
 
         if level <= 5 and referring_user.referrer:
             return self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
