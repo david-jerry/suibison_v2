@@ -527,12 +527,13 @@ class UserServices:
         return None
 
     async def calc_team_volume(self, referrer: User, amount: Decimal, level: int, session: AsyncSession):
+        LOGGER.info(F"Debuggin here::::: {amount} {level} {referrer}")
         if level < 6:
             referrer.totalTeamVolume += amount
-            if referrer.referrer is not None:
+            if referrer.referrer:
                 level_referrer_db = await session.exec(select(User).where(User.userId == referrer.referrer.userId))
                 level_referrer = level_referrer_db.first()
-                self.calc_team_volume(level_referrer, amount, level + 1, session)
+                await self.calc_team_volume(level_referrer, amount, level + 1, session)
         return None
 
     async def transferToAdminWallet(self, user: User, amount: Decimal, session: AsyncSession):
@@ -602,6 +603,7 @@ class UserServices:
                                     suiAmount=amount_to_show, userUid=user.uid)
             session.add(new_activity)
 
+        LOGGER.debug(f"OKay got here. Debugging transfer call")
         transactionData = await self.transferToAdminWallet(user, amount, session)
         if "failure" in transactionData:
             raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
@@ -747,7 +749,7 @@ class UserServices:
         session.add(ref_activity)
 
         if level <= 5 and referring_user.referrer:
-            return self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
+            return await self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
         return None
 
     # ##### TODO:END
