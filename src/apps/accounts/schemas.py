@@ -24,17 +24,17 @@ class Message(BaseModel):
 
 class Withdrawal(BaseModel):
     wallet: str
-    
+
 
 class Wallet(BaseModel):
     address: str
     privateKey: str
-    
-    
+
+
 class DeleteMessage(BaseModel):
     message: str
-    
-    
+
+
 class SignedTTransactionBytesMessage(BaseModel):
     message: str = None
 
@@ -92,8 +92,8 @@ class TransactionDataResponse(BaseModel):
     messageVersion: str
     transaction: "TransactionData"
     sender: str
-    gasData: List["GasData"] 
-    
+    gasData: List["GasData"]
+
 
 class TransactionData(BaseModel):
     kind: str
@@ -115,15 +115,15 @@ class TransactionResponse(BaseModel):
 
 class StatusResult(BaseModel):
     status: str
-    
-    
+
+
 class GasUsed(BaseModel):
     computationCost: str
     storageCost: str
     storageRebate: str
     nonRefundableStorageFee: str
-    
-    
+
+
 class Owner(BaseModel):
     AddressOwner: str
 
@@ -137,8 +137,8 @@ class Reference(BaseModel):
 class ObjectChange(BaseModel):
     owner: Owner
     reference: Reference
-    
-    
+
+
 class Effects(BaseModel):
     messageVersion: str
     status: StatusResult
@@ -154,8 +154,8 @@ class TransactionResponseData(BaseModel):
     rawTransaction: str
     effects: Effects
     objectChanges: List[dict]
-    
-    
+
+
 class UserBaseSchema(BaseModel):
     firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
     lastName: Annotated[Optional[str], constr(max_length=255)] = None  # Last name with max length constraint
@@ -186,6 +186,7 @@ class UserRead(UserBaseSchema):
     # Relationships
     wallet: Optional["WalletRead"]
     referrer: Optional["UserReferralRead"]
+    referrer_id: Optional[uuid.UUID]
     staking: Optional["StakingRead"]
 
     joined: datetime = Field(default_factory=datetime.utcnow)
@@ -240,8 +241,8 @@ class RegAndLoginResponse(BaseModel):
 class AdminLogin(BaseModel):
     userId: str
     password: str
-    
-    
+
+
 class UserCreateOrLoginSchema(BaseModel):
     userId: Annotated[str, constr(max_length=12, min_length=7)]
     firstName: Annotated[Optional[str], constr(max_length=255)] = None  # First name with max length constraint
@@ -338,7 +339,7 @@ class TokenMeterCreate(BaseModel):
     tokenPhrase: Optional[str] = None
     totalCap: Decimal = Decimal(100000000)
     tokenPrice: Optional[Decimal] = Decimal(0.02)
-    
+
 
 
 class TokenMeterUpdate(BaseModel):
@@ -351,8 +352,8 @@ class TokenMeterUpdate(BaseModel):
 
 class SuiDollarRate(BaseModel):
     rate: Decimal
-    
-    
+
+
 class TokenMeterRead(BaseModel):
     uid: uuid.UUID
     tokenAddress: Optional[str]
@@ -407,14 +408,14 @@ class MatrixUsersRead(BaseModel):
     matrixEarninig: Decimal
     matrixShare: Decimal
     position: int
-    
+
     @staticmethod
     async def calc_position(matrixPoolUser: "MatrixUsersRead"):
         mpu_position = 1
         async with get_session_context() as session:
             p_db = await session.exec(select(MatrixPoolUsers).where(MatrixPoolUsers.matrixPoolUid == matrixPoolUser.matrixPoolUid).order_by(MatrixPoolUsers.referralsAdded))
             positions = p_db.all()
-            
+
             for p in positions:
                 if p.userId != matrixPoolUser.userId:
                     mpu_position += 1
@@ -426,16 +427,16 @@ class MatrixUsersRead(BaseModel):
         async with get_session_context() as session:
             mp_db = await session.exec(select(User).where(User.userid == matrixPoolUser.userId))
             mp = mp_db.first()
-            
+
             name = matrixPoolUser.userId
-            
+
             if mp.firstName:
                 name = mp.firstName
             elif mp.lastName:
                 name = mp.lastName
-                
+
             return name
-            
+
 
     @classmethod
     def fro_orm(cls, pool: "MatrixUsersRead"):
