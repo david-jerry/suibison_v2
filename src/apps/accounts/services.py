@@ -635,7 +635,7 @@ class UserServices:
         if not deposit_amount:
             return
 
-        with session.begin():
+        async with session.begin():
             await self._update_user_balance(user, deposit_amount, session)
 
             if deposit_amount < STAKING_MIN:
