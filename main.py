@@ -22,6 +22,11 @@ from fastapi.encoders import jsonable_encoder
 from telegram_bot import telegramApp
 import uvicorn
 
+import logging
+
+logging.basicConfig()
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+
 version = Config.VERSION
 description = f"""
 # SUI Bison API Documentation
