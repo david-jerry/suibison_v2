@@ -32,35 +32,35 @@ def fetch_sui_usd_price_hourly():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(run_cncurrent_tasks())
-    loop.close()
+    # loop.close()
 
 @celery_app.task(name="check_and_update_balances")
 def check_and_update_balances():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(fetch_sui_balance())
-    loop.close()
+    # loop.close()
 
 @celery_app.task(name="run_calculate_daily_tasks")
 def run_calculate_daily_tasks():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(calculate_daily_tasks())
-    loop.close()
+    # loop.close()
 
 @celery_app.task(name="run_create_matrix_pool")
 def run_create_matrix_pool():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(create_matrix_pool())
-    loop.close()
+    # loop.close()
 
 @celery_app.task(name="run_calculate_users_matrix_pool_share")
 def run_calculate_users_matrix_pool_share():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     loop.run_until_complete(calculate_users_matrix_pool_share())
-    loop.close()
+    # loop.close()
 
 
 async def run_cncurrent_tasks():
