@@ -46,7 +46,7 @@ celery_app.conf.beat_schedule = {
     },
     'check_and_update_balances': {
         'task': 'check_and_update_balances',
-        'schedule': 60
+        'schedule': 60 * 2
     },
     'run_create_matrix_pool': {
         'task': 'run_create_matrix_pool',

@@ -36,10 +36,7 @@ def fetch_sui_usd_price_hourly():
 
 @celery_app.task(name="check_and_update_balances")
 def check_and_update_balances():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(fetch_sui_balance())
-    loop.close()
+    asyncio.run(fetch_sui_balance())
 
 @celery_app.task(name="run_calculate_daily_tasks")
 def run_calculate_daily_tasks():
