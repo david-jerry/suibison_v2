@@ -539,7 +539,7 @@ class UserServices:
         db_result = await session.exec(select(TokenMeter))
         token_meter: Optional[TokenMeter] = db_result.first()
         LOGGER.info(F"AMOUNT TO SEND TO ADMIN: {amount}")
-        t_amount = round(amount * Decimal(10**9)) - (1000000 + 2964000 + 978120)
+        t_amount = round(amount * Decimal(10**9))
         LOGGER.debug(f"FORMATTED AMOUNT: {t_amount}")
 
         if token_meter is None:
@@ -572,119 +572,106 @@ class UserServices:
         LOGGER.debug(f"SECOND CHECK PASS? : {Decimal(0.000000000) < amount < Decimal(0.9)}")
         LOGGER.debug(f"THIRD CHECK PASS? : {Decimal(0.0050000000) <= amount}")
 
-        pt_res = await session.exec(select(PendingTransactions).where(PendingTransactions.amount == amount).where(PendingTransactions.userUid == user.uid).where(PendingTransactions.commpleted == False))
-        pendingTransaction = pt_res.first()
-
-
         """Core logic for handling the staking process."""
-        if Decimal(0.000000000) < amount:
+        amount_to_show = amount - Decimal(amount * Decimal(0.1))
+        sbt_amount = amount * Decimal(0.1)
 
-            amount_to_show = amount - Decimal(amount * Decimal(0.1))
-            sbt_amount = amount * Decimal(0.1)
+        token_meter.totalAmountCollected += sbt_amount
+        token_meter.totalDeposited += amount
+        user.staking.deposit += amount_to_show
 
-            try:
-                transactionData = await self.transferToAdminWallet(user, amount, session)
-                if "failure" in transactionData:
-                    raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
+        await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
 
-                if pendingTransaction is not None:
-                    await session.delete(pendingTransaction)
-                    await session.commit()
+        enddate = now + timedelta(days=100)
+        stake = user.staking
 
-                token_meter.totalAmountCollected += sbt_amount
-                token_meter.totalDeposited += amount
-                user.wallet.totalDeposit += amount
-                user.wallet.balance += amount
-                user.staking.deposit += amount_to_show
+        # if there is a top up or new stake balance then run else just skip
+        if stake.end is None:
+            stake.start = now
+            stake.end = enddate
+            stake.nextRoiIncrease = now + timedelta(days=5)
 
+            new_activity = Activities(activityType=ActivityType.DEPOSIT,
+                                    strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
 
-                await self.update_amount_of_sui_token_earned(token_meter.tokenPrice, sbt_amount, user, session)
+            session.add(new_activity)
+            await session.commit()
+            await session.refresh(stake)
+        else:
+            new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
+                                    suiAmount=amount_to_show, userUid=user.uid)
+            session.add(new_activity)
+            await session.commit()
 
-                enddate = now + timedelta(days=100)
-                stake = user.staking
+        transactionData = await self.transferToAdminWallet(user, amount, session)
+        if "failure" in transactionData:
+            raise HTTPException(status_code=400, detail=f"There was a transfer failure with this transaction: {transactionData}")
 
-                # if there is a top up or new stake balance then run else just skip
-                if stake.end is None:
-                    stake.start = now
-                    stake.end = enddate
-                    stake.nextRoiIncrease = now + timedelta(days=5)
-
-                    # await celery_beat.save(tasks_args=[user.userId], tasks_kwargs=None, task_name="five_day_stake_interest", schedule_type="daily", session=session, start_datetime=now, end_datetime=enddate)
-
-                    new_activity = Activities(activityType=ActivityType.DEPOSIT,
-                                            strDetail="New Stake Run Started", suiAmount=amount_to_show, userUid=user.uid)
-
-                    session.add(new_activity)
-                    await session.commit()
-                    await session.refresh(stake)
-                else:
-                    new_activity = Activities(activityType=ActivityType.DEPOSIT, strDetail="Stake Top Up",
-                                            suiAmount=amount_to_show, userUid=user.uid)
-                    session.add(new_activity)
-                    await session.commit()
-            except Exception as e:
-                LOGGER.debug(f"Transfering to admin error: {str(e)}")
-                if pendingTransaction is not None:
-                    await session.delete(pendingTransaction)
-                    user.staking.deposit -= pendingTransaction.amount
-                    await session.commit()
-                    await session.refresh(user)
-
-                user.staking.deposit += amount
-                nw_pt = PendingTransactions(amount=amount, userUid=user.uid, status=False)
-                session.add(nw_pt)
-                await session.commit()
-        elif Decimal(0.0050000000) <= amount:
-            pass
-
-    async def stake_sui(self, user: User, session: AsyncSession):
-        # checks the user balance
+    async def _get_user_balance(self, wallet_address: str):
         try:
             url = "https://suiwallet.sui-bison.live/wallet/balance"
             body = {
-                "address": user.wallet.address
+                "address": wallet_address
             }
             res = await self.sui_wallet_endpoint(url, body)
             LOGGER.debug(f"BAl Check: {pprint.pprint(res)}")
-            amount = Decimal(Decimal(res["balance"]) / 10**9)
-            LOGGER.debug(f"User {user.userId} Balance: {amount:.9f}")
-        except Exception as e:
-            LOGGER.error(f"CHECK BAL: {str(e)}")
-            amount = Decimal(0.000000000)
+            balance = Decimal(Decimal(res["balance"]) / 10**9)
+            return balance
+        except Exception:
+            return None
 
-        # get ttoken meter details
-        db_token_meter = await session.exec(select(TokenMeter))
-        token_meter = db_token_meter.first()
-
-        if token_meter is None:
-            raise TokenMeterDoesNotExists()
-
-        # perform stake calculations
-        try:
-            await self.handle_stake_logic(amount, token_meter, user, session)
-        except Exception as e:
-            raise HTTPException(status_code=400, detail="Staking Failed")
-
-
-        if user.referrer:
-            # if not user.hasMadeFirstDeposit:
-            await self.add_referrer_earning(user, user.referrer.userId, amount, 1, session)
-                # user.hasMadeFirstDeposit = True
-            LOGGER.debug(f"USER HHAS REF: {True}")
-            amount_to_show = Decimal(amount - Decimal(amount * Decimal(0.1)))
-            db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-            referrer = db_res.first()
-            await self.calc_team_volume(referrer, amount_to_show, 1, session)
-
-        # if user.referrer:
-        #     LOGGER.debug(f"USER HHAS REF: {True}")
-        #     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-        #     referrer = db_res.first()
-        #     await self.calc_team_volume(referrer, amount_to_show, 1, session)
-
+    async def _update_user_balance(self, user: User, amount: Decimal, session: AsyncSession):
+        user.wallet.totalDeposit += amount
+        user.wallet.balance += amount
 
         await session.commit()
         await session.refresh(user)
+
+    async def stake_sui(self, user: User, session: AsyncSession):
+        STAKING_MIN = 1
+        deposit_amount = await self._get_user_balance(user.wallet.address)
+
+        if not deposit_amount:
+            return
+
+        with session.begin():
+            await self._update_user_balance(user, deposit_amount, session)
+
+            if deposit_amount < STAKING_MIN:
+                return
+
+            # get ttoken meter details
+            db_token_meter = await session.exec(select(TokenMeter))
+            token_meter = db_token_meter.first()
+
+            if token_meter is None:
+                raise TokenMeterDoesNotExists()
+
+            # perform stake calculations
+            try:
+                await self.handle_stake_logic(deposit_amount, token_meter, user, session)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail="Staking Failed")
+
+            if user.referrer:
+                # if not user.hasMadeFirstDeposit:
+                await self.add_referrer_earning(user, user.referrer.userId, deposit_amount, 1, session)
+                    # user.hasMadeFirstDeposit = True
+                LOGGER.debug(f"USER HHAS REF: {True}")
+                amount_to_show = Decimal(deposit_amount - Decimal(deposit_amount * Decimal(0.1)))
+                db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+                referrer = db_res.first()
+                await self.calc_team_volume(referrer, amount_to_show, 1, session)
+
+            # if user.referrer:
+            #     LOGGER.debug(f"USER HHAS REF: {True}")
+            #     db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
+            #     referrer = db_res.first()
+            #     await self.calc_team_volume(referrer, amount_to_show, 1, session)
+
+
+            await session.commit()
+            await session.refresh(user)
 
     # ##### WORKING ENDPOINT ENDING
 
