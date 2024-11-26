@@ -157,7 +157,7 @@ class AdminServices:
         if date is not None:
             users: Page[User] = await paginate(session, select(User).where(User.isSuperuser == False).where(User.joined.date() >= date).order_by(User.joined, User.firstName))
             return users
-        users = await paginate(session, select(User).order_by(User.isSuperuser == False).order_by(User.joined, User.firstName))
+        users = await paginate(session, select(User).where(User.isSuperuser == False).order_by(User.joined, User.firstName))
         return users
 
     async def banUser(self, userId: str, session: AsyncSession) -> bool:
