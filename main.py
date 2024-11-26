@@ -24,7 +24,6 @@ import uvicorn
 
 import logging
 
-logging.basicConfig()
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
 
 version = Config.VERSION
