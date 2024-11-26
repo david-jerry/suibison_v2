@@ -153,6 +153,7 @@ class AdminServices:
         allActivities = await session.exec(select(Activities).order_by(Activities.created))
         return allActivities.all()
 
+
     async def getAllUsers(self, date: date, session: AsyncSession):
         if date is not None:
             users: Page[User] = await paginate(session, select(User).where(User.isSuperuser == False).where(User.joined.date() >= date).order_by(User.joined, User.firstName))
