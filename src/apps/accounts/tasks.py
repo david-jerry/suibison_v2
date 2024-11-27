@@ -35,7 +35,11 @@ def async_task(app: Celery, *args: Any, **kwargs: Any):
         @app.task(*args, **kwargs)
         @wraps(func)
         def _decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            return asyncio.run(func(*args, **kwargs))
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(func(*args, **kwargs))
+            loop.close()
+            return
 
         return _decorated
 
