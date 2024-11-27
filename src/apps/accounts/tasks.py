@@ -7,17 +7,18 @@ from typing import Annotated, List, Optional
 from celery import shared_task
 from fastapi import Depends
 
+from sqlalchemy.orm import sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
+
 import ast
 
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
 import yfinance as yf
-from functools import wraps
-from celery import Celery, Task
-from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
+
 from src.apps.accounts.services import UserServices
 from src.celery_tasks import celery_app
 from src.db import engine
-from src.db.engine import get_session, get_session_context, get_async_session_context
+from src.db.engine import get_session, get_session_context
 from src.db.redis import redis_client
 from src.utils.calculations import get_rank, matrix_share
 from src.utils.logger import LOGGER
@@ -25,45 +26,41 @@ from sqlmodel import select
 
 user_services = UserServices()
 
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
+@celery_app.task(name="fetch_sui_usd_price_hourly")
+def fetch_sui_usd_price_hourly():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(run_cncurrent_tasks())
+    loop.close()
 
+@celery_app.task(name="check_and_update_balances")
+def check_and_update_balances():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(fetch_sui_balance())
+    loop.close()
 
-def async_task(app: Celery, *args: Any, **kwargs: Any):
-    def _decorator(func: Callable[_P, Coroutine[Any, Any, _R]]) -> Task:
+@celery_app.task(name="run_calculate_daily_tasks")
+def run_calculate_daily_tasks():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(calculate_daily_tasks())
+    loop.close()
 
-        @app.task(*args, **kwargs)
-        @wraps(func)
-        def _decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(func(*args, **kwargs))
-            loop.close()
-            return
+@celery_app.task(name="run_create_matrix_pool")
+def run_create_matrix_pool():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(create_matrix_pool())
+    loop.close()
 
-        return _decorated
+@celery_app.task(name="run_calculate_users_matrix_pool_share")
+def run_calculate_users_matrix_pool_share():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(calculate_users_matrix_pool_share())
+    loop.close()
 
-    return _decorator
-
-@async_task(celery_app, bind=True, name="fetch_sui_usd_price_hourly")
-async def fetch_sui_usd_price_hourly(*args, **kwargs):
-    await run_cncurrent_tasks()
-
-@async_task(celery_app, bind=True, name="check_and_update_balances")
-async def check_and_update_balances(*args, **kwargs):
-    await fetch_sui_balance()
-
-@async_task(celery_app, bind=True, name="run_calculate_daily_tasks")
-async def run_calculate_daily_tasks(*args, **kwargs):
-    await calculate_daily_tasks()
-
-@async_task(celery_app, bind=True, name="run_create_matrix_pool")
-async def run_create_matrix_pool(*args, **kwargs):
-    await create_matrix_pool()
-
-@async_task(celery_app, bind=True, name="run_calculate_users_matrix_pool_share")
-async def run_calculate_users_matrix_pool_share(*args, **kwargs):
-    await calculate_users_matrix_pool_share()
 
 async def run_cncurrent_tasks():
     async with asyncio.TaskGroup() as group:
@@ -83,8 +80,7 @@ async def fetch_sui_price():
 
 
 async def fetch_sui_balance():
-    LOGGER.info(f"Running fetch balance")
-    async with get_async_session_context() as session:
+    async with get_session_context() as session:
         try:
             now = datetime.now()
             user_db = await session.exec(select(User).where(User.isBlocked == False))
