@@ -688,7 +688,7 @@ class UserServices:
 
             LOGGER.debug(f"Got here 9")
             if user.referrer:
-                LOGGER.debug(f"Got here 10")
+                LOGGER.debug(f"Got here 10. Referrer name: {user.referrer.userId}")
                 # if not user.hasMadeFirstDeposit:
                 await self.add_referrer_earning(user, user.referrer.userId, deposit_amount, 1, session)
                     # user.hasMadeFirstDeposit = True
@@ -722,7 +722,7 @@ class UserServices:
     # ###### TODO: CHECK FOR REASONS THE REFERRAL BONUS IS NOT WORKING
 
     async def add_referrer_earning(self, referral: User, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
-        LOGGER.debug(f"executing referral earning calculations, level: {level}")
+        LOGGER.debug(f"executing referral earning calculations, level: {level}, referrerId: {referrer}")
 
         db_result = await session.exec(select(User).where(User.userId == referrer))
 
@@ -732,7 +732,7 @@ class UserServices:
             LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO")
             return None
 
-        LOGGER.debug("passed user check")
+        LOGGER.debug(f"passed user check:: {referring_user.userId}, referrer referrer: {referring_user.referrer.userId}")
 
         # check for speed boost
         # fetch referrals for the referrer if available
