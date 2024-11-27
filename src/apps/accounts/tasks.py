@@ -7,9 +7,6 @@ from typing import Annotated, List, Optional
 from celery import shared_task
 from fastapi import Depends
 
-from sqlalchemy.orm import sessionmaker
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 import ast
 
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
