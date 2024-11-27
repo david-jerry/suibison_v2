@@ -14,7 +14,10 @@ import ast
 
 from src.apps.accounts.models import MatrixPool, MatrixPoolUsers, TokenMeter, User, UserReferral, UserStaking, UserWallet
 import yfinance as yf
-
+from functools import wraps
+from celery import Celery, Task
+from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
+from asgiref import sync
 from src.apps.accounts.services import UserServices
 from src.celery_tasks import celery_app
 from src.db import engine
@@ -27,6 +30,23 @@ from sqlmodel import select
 user_services = UserServices()
 session = Annotated[AsyncSession, Depends(get_session)]
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def async_task(app: Celery, *args: Any, **kwargs: Any):
+    def _decorator(func: Callable[_P, Coroutine[Any, Any, _R]]) -> Task:
+        sync_call = sync.AsyncToSync(func)
+
+        @app.task(*args, **kwargs)
+        @wraps(func)
+        def _decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            return sync_call(*args, **kwargs)
+
+        return _decorated
+
+    return _decorator
+
 @celery_app.task(name="fetch_sui_usd_price_hourly")
 def fetch_sui_usd_price_hourly():
     loop = asyncio.new_event_loop()
@@ -34,11 +54,12 @@ def fetch_sui_usd_price_hourly():
     loop.run_until_complete(run_cncurrent_tasks())
     loop.close()
 
-@celery_app.task(name="check_and_update_balances")
-def check_and_update_balances():
+@async_task(celery_app, name="check_and_update_balances", bind=True)
+async def check_and_update_balances():
+    await fetch_sui_balance()
     # loop = asyncio.new_event_loop()
     # asyncio.set_event_loop(loop)
-    asyncio.run(fetch_sui_balance())
+    # asyncio.run(fetch_sui_balance())
     # loop.close()
 
 @celery_app.task(name="run_calculate_daily_tasks")
