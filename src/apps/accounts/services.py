@@ -722,7 +722,7 @@ class UserServices:
     # ###### TODO: CHECK FOR REASONS THE REFERRAL BONUS IS NOT WORKING
 
     async def add_referrer_earning(self, referral: User, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
-        LOGGER.debug("executing referral earning calculations, level: {level}")
+        LOGGER.debug(f"executing referral earning calculations, level: {level}")
 
         db_result = await session.exec(select(User).where(User.userId == referrer))
 
