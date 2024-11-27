@@ -20,14 +20,13 @@ from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
 from src.apps.accounts.services import UserServices
 from src.celery_tasks import celery_app
 from src.db import engine
-from src.db.engine import get_session, get_session_context
+from src.db.engine import get_session, get_session_context, get_async_session_context
 from src.db.redis import redis_client
 from src.utils.calculations import get_rank, matrix_share
 from src.utils.logger import LOGGER
 from sqlmodel import select
 
 user_services = UserServices()
-session = Annotated[AsyncSession, Depends(get_session)]
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -85,7 +84,7 @@ async def fetch_sui_price():
 
 async def fetch_sui_balance():
     LOGGER.info(f"Running fetch balance")
-    async with get_session_context() as session:
+    async with get_async_session_context() as session:
         try:
             now = datetime.now()
             user_db = await session.exec(select(User).where(User.isBlocked == False))

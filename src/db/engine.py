@@ -66,7 +66,7 @@ async def get_session_context() -> AsyncSession: # type: ignore
 
 
 @asynccontextmanager
-async def get_async_session():
+async def get_async_session_context():
     async with AsyncSession(engine) as session:
         try:
             yield session
