@@ -81,22 +81,23 @@ async def fetch_sui_price():
 
 
 async def fetch_sui_balance():
-    try:
-        now = datetime.now()
-        async with get_session_context() as session:
+    async with get_session_context() as session:
+        try:
+            now = datetime.now()
             user_db = await session.exec(select(User).where(User.isBlocked == False))
             users = user_db.all()
 
             for user in users:
                 LOGGER.debug(f"checking here: user")
                 await user_services.stake_sui(user, session)
-    except Exception as e:
-        LOGGER.error(e)
+        except Exception as e:
+            LOGGER.error(e)
+            await session.close()
 
 async def calculate_users_matrix_pool_share():
-    try:
-        now = datetime.now()
-        async with get_session_context() as session:
+    async with get_session_context() as session:
+        try:
+            now = datetime.now()
             # ###### CALCULATE USERS SHARE TO AN ACTIVE POOL
             matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
             active_matrix_pool_or_new: Optional[MatrixPool] = matrix_db.first()
@@ -120,13 +121,14 @@ async def calculate_users_matrix_pool_share():
 
                     await session.commit()
                     await session.refresh(mp_user)
-    except Exception as e:
-        LOGGER.error(e)
+        except Exception as e:
+            LOGGER.error(e)
+            await session.close()
 
 async def calculate_daily_tasks():
-    try:
-        now = datetime.now()
-        async with get_session_context() as session:
+    async with get_session_context() as session:
+        try:
+            now = datetime.now()
             user_db = await session.exec(select(User).where(User.isBlocked == False))
             users: List[User] = user_db.all()
 
@@ -180,13 +182,14 @@ async def calculate_daily_tasks():
                 # session.add(user)
                 await session.commit()
                 await session.refresh(user)
-    except Exception as e:
-        LOGGER.error(e)
+        except Exception as e:
+            LOGGER.error(e)
+            await session.close()
 
 async def create_matrix_pool():
-    try:
-        now = datetime.now()
-        async with get_session_context() as session:
+    async with get_session_context() as session:
+        try:
+            now = datetime.now()
             matrix_db = await session.exec(select(MatrixPool).where(MatrixPool.endDate >= now))
             active_matrix_pool_or_new = matrix_db.first()
             sevenDaysLater = now + timedelta(days=7)
@@ -197,14 +200,15 @@ async def create_matrix_pool():
                 )
                 session.add(new_pool)
                 await session.commit()
-    except Exception as e:
-        LOGGER.error(e)
+        except Exception as e:
+            LOGGER.error(e)
+            await session.close()
 
 
 async def add_fast_bonus():
-    try:
-        now = datetime.now()
-        async with get_session_context() as session:
+    async with get_session_context() as session:
+        try:
+            now = datetime.now()
             user_db = await session.exec(select(User).where(User.isBlocked == False))
             users: List[User] = user_db.all()
 
@@ -229,8 +233,9 @@ async def add_fast_bonus():
                         user.staking.deposit += Decimal(1.00)
 
                 # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
-    except Exception as e:
-        LOGGER.error(e)
+        except Exception as e:
+            LOGGER.error(e)
+            await session.close()
 
 
 
