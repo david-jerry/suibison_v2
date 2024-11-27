@@ -83,6 +83,7 @@ async def fetch_sui_balance():
         users = user_db.all()
 
         for user in users:
+            LOGGER.debug(f"checking here: user")
             await user_services.stake_sui(user, session)
 
 async def calculate_users_matrix_pool_share():

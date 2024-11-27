@@ -640,18 +640,26 @@ class UserServices:
         user.wallet.balance += amount
 
     async def stake_sui(self, user: User, session: AsyncSession):
+        LOGGER.debug(f"Got here 1")
         deposit_amount = await self._get_user_balance(user.wallet.address)
 
         if not deposit_amount:
             return
 
+        LOGGER.debug(f"Got here 2")
+
         try:
             await self._update_user_balance(user, deposit_amount, session)
 
+            LOGGER.debug(f"Got here 3")
+
             if deposit_amount < STAKING_MIN:
+                LOGGER.debug(f"Got here 4")
                 await session.commit()
                 await session.refresh(user)
                 return
+
+            LOGGER.debug(f"Got here 5")
 
             # get ttoken meter details
             db_token_meter = await session.exec(select(TokenMeter))
@@ -660,13 +668,19 @@ class UserServices:
             if token_meter is None:
                 raise TokenMeterDoesNotExists()
 
+            LOGGER.debug(f"Got here 6")
+
             # perform stake calculations
             try:
                 await self.handle_stake_logic(deposit_amount, token_meter, user, session)
+                LOGGER.debug(f"Got here 7")
             except Exception as e:
+                LOGGER.debug(f"Got here 8")
                 raise HTTPException(status_code=400, detail="Staking Failed")
 
+            LOGGER.debug(f"Got here 9")
             if user.referrer:
+                LOGGER.debug(f"Got here 10")
                 # if not user.hasMadeFirstDeposit:
                 await self.add_referrer_earning(user, user.referrer.userId, deposit_amount, 1, session)
                     # user.hasMadeFirstDeposit = True
@@ -675,6 +689,8 @@ class UserServices:
                 db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
                 referrer = db_res.first()
                 await self.calc_team_volume(referrer, amount_to_show, 1, session)
+
+            LOGGER.debug(f"Got here 11")
 
             # if user.referrer:
             #     LOGGER.debug(f"USER HHAS REF: {True}")
@@ -686,6 +702,7 @@ class UserServices:
             await session.commit()
             await session.refresh(user)
         except Exception:
+            LOGGER.debug(f"Got here 12")
             await session.rollback()
 
     # ##### WORKING ENDPOINT ENDING
