@@ -85,6 +85,7 @@ async def fetch_sui_price():
 
 
 async def fetch_sui_balance():
+    LOGGER.info(f"Running fetch balance")
     async with get_session_context() as session:
         try:
             now = datetime.now()
