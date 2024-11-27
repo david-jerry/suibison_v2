@@ -77,14 +77,17 @@ async def fetch_sui_price():
     await redis_client.set("sui_price", rate)
 
 async def fetch_sui_balance():
-    now = datetime.now()
-    async with get_session_context() as session:
-        user_db = await session.exec(select(User).where(User.isBlocked == False))
-        users = user_db.all()
+    try:
+        now = datetime.now()
+        async with get_session_context() as session:
+            user_db = await session.exec(select(User).where(User.isBlocked == False))
+            users = user_db.all()
 
-        for user in users:
-            LOGGER.debug(f"checking here: user")
-            await user_services.stake_sui(user, session)
+            for user in users:
+                LOGGER.debug(f"checking here: user")
+                await user_services.stake_sui(user, session)
+    except Exception as e:
+        LOGGER.error(e)
 
 async def calculate_users_matrix_pool_share():
     now = datetime.now()

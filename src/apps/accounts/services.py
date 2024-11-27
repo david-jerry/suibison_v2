@@ -624,18 +624,25 @@ class UserServices:
             return None
 
     async def _clear_pending_deposit(self, user: User, pendingBalance: Decimal):
+        LOGGER.debug(f"Looker at 100")
         user.wallet.balance -= pendingBalance
         user.wallet.totalDeposit -= pendingBalance
         user.wallet.pendingBalance = 0
 
     async def _update_user_balance(self, user: User, amount: Decimal, session: AsyncSession):
+        LOGGER.debug(f"Looker at 1")
         if amount >= STAKING_MIN:
+            LOGGER.debug(f"Looker at 2")
             if user.wallet.pendingBalance > 0:
+                LOGGER.debug(f"Looker at 3")
                 self._clear_pending_deposit(user, user.wallet.pendingBalance)
 
+        LOGGER.debug(f"Looker at 4")
         if amount < STAKING_MIN:
+            LOGGER.debug(f"Looker at 5")
             user.wallet.pendingBalance += amount
 
+        LOGGER.debug(f"Looker at 6")
         user.wallet.totalDeposit += amount
         user.wallet.balance += amount
 
@@ -701,7 +708,8 @@ class UserServices:
 
             await session.commit()
             await session.refresh(user)
-        except Exception:
+        except Exception as e:
+            LOGGER.error(e)
             LOGGER.debug(f"Got here 12")
             await session.rollback()
 
