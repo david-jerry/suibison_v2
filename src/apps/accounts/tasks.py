@@ -34,12 +34,11 @@ _R = TypeVar("_R")
 
 def async_task(app: Celery, *args: Any, **kwargs: Any):
     def _decorator(func: Callable[_P, Coroutine[Any, Any, _R]]) -> Task:
-        sync_call = asyncio.run(func)
 
         @app.task(*args, **kwargs)
         @wraps(func)
         def _decorated(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            return sync_call(*args, **kwargs)
+            return asyncio.run(func(*args, **kwargs))
 
         return _decorated
 
