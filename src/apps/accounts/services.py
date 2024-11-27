@@ -648,7 +648,7 @@ class UserServices:
         user.wallet.balance += amount
 
     async def stake_sui(self, user: User, session: AsyncSession):
-        LOGGER.debug(f"Got here 1:::: {user.firstName} {user.userId} {user.uid} {user.referrer_id} {user.referrer.userUid} {user.referrer.userId}")
+        LOGGER.debug(f"Got here 1:::: {user.firstName} {user.userId} {user.uid} {user.referrer_id} {user.referrer.userUid if user.referrer else None} {user.referrer.userId if user.referrer else None}")
         deposit_amount = await self._get_user_balance(user.wallet.address)
 
         if not deposit_amount:
