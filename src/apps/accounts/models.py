@@ -160,7 +160,7 @@ class UserWallet(SQLModel, table=True):
     privateKey: str = Field(unique=True, nullable=False)
 
     balance: Decimal = Field(decimal_places=9, default=Decimal(0.00))
-    pendingBalance: Decimal = Field(nullable=True, decimal_places=9, default=Decimal(0.00))
+    pendingBalance: Decimal = Field(default=Decimal(0.00), decimal_places=9, default=Decimal(0.00))
     earnings: Decimal = Field(decimal_places=9, default=Decimal(0.00))
     availableReferralEarning: Decimal = Field(decimal_places=9, default=Decimal(0.00))
     expectedRankBonus: Decimal = Field(decimal_places=9, default=Decimal(0.00))
