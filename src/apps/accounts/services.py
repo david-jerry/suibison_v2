@@ -722,7 +722,7 @@ class UserServices:
     # ###### TODO: CHECK FOR REASONS THE REFERRAL BONUS IS NOT WORKING
 
     async def add_referrer_earning(self, referral: User, referrer: Optional[str], amount: Decimal, level: int, session: AsyncSession):
-        LOGGER.debug("eexecuting referral earning calculations")
+        LOGGER.debug("executing referral earning calculations, level: {level}")
 
         db_result = await session.exec(select(User).where(User.userId == referrer))
 
@@ -744,6 +744,9 @@ class UserServices:
         rf_db = await session.exec(select(UserReferral).where(UserReferral.theirUserId == referral.userId).where(UserReferral.userId == referrer))
         referral_to_update = rf_db.first()
 
+        if not referral_to_update:
+            LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO 2")
+            return None
 
         # ####### Calculate Referral Bonuses
         percentage = Decimal(0.1)
@@ -757,9 +760,9 @@ class UserServices:
             percentage = Decimal(0.01)
 
         LOGGER.debug(f"REFERRAL TO UPDATE: {referral_to_update.user.firstName}")
-        if referral_to_update is not None:
-            referral_to_update.stake += amount
-            referral_to_update.reward += percentage * amount
+        referral_to_update.stake += amount
+        referral_to_update.reward += percentage * amount
+
         referring_user.totalReferralsStakes += amount
         # Save the referral level down to the 5th level in redis for improved performance
         referring_user.wallet.earnings += percentage * amount
@@ -767,7 +770,7 @@ class UserServices:
         referring_user.wallet.totalReferralEarnings += percentage * amount
         referring_user.wallet.totalReferralBonus += percentage * amount
 
-        LOGGER.info(f"REFERAL EARNING FOR {referring_user.firstName if referring_user.firstName else referring_user.userId} from {referral.firstName if referral.firstName is not None else referral.userId}: {Decimal(percentage * amount):.2f}")
+        LOGGER.info(f"REFERAL EARNING FOR {referring_user.firstName if referring_user.firstName else referring_user.userId} from {referral.firstName if referral.firstName else referral.userId}: {Decimal(percentage * amount):.2f}")
         # ####### END ######### #
 
         ref_activity = Activities(activityType=ActivityType.REFERRAL, strDetail="Referral Bonus", suiAmount=Decimal(percentage * amount), userUid=referring_user.uid)

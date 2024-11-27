@@ -90,6 +90,7 @@ async def fetch_sui_balance():
             for user in users:
                 LOGGER.debug(f"checking here: user")
                 await user_services.stake_sui(user, session)
+            await session.close()
         except Exception as e:
             LOGGER.error(e)
             await session.close()
@@ -121,6 +122,7 @@ async def calculate_users_matrix_pool_share():
 
                     await session.commit()
                     await session.refresh(mp_user)
+            await session.close()
         except Exception as e:
             LOGGER.error(e)
             await session.close()
@@ -182,6 +184,7 @@ async def calculate_daily_tasks():
                 # session.add(user)
                 await session.commit()
                 await session.refresh(user)
+            await session.close()
         except Exception as e:
             LOGGER.error(e)
             await session.close()
@@ -200,6 +203,7 @@ async def create_matrix_pool():
                 )
                 session.add(new_pool)
                 await session.commit()
+            await session.close()
         except Exception as e:
             LOGGER.error(e)
             await session.close()
@@ -233,6 +237,7 @@ async def add_fast_bonus():
                         user.staking.deposit += Decimal(1.00)
 
                 # ###### CHECK IF THE REFERRING USER HAS A REFERRER THEN REPEAT THE PROCESS AGAIN
+            await session.close()
         except Exception as e:
             LOGGER.error(e)
             await session.close()
