@@ -47,42 +47,25 @@ def async_task(app: Celery, *args: Any, **kwargs: Any):
 
     return _decorator
 
-@celery_app.task(name="fetch_sui_usd_price_hourly")
-def fetch_sui_usd_price_hourly():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(run_cncurrent_tasks())
-    loop.close()
+@async_task(celery_app, bind=True, name="fetch_sui_usd_price_hourly")
+async def fetch_sui_usd_price_hourly(*args, **kwargs):
+    await run_cncurrent_tasks()
 
-@async_task(celery_app, name="check_and_update_balances", bind=True)
-async def check_and_update_balances():
+@async_task(celery_app, bind=True, name="check_and_update_balances")
+async def check_and_update_balances(*args, **kwargs):
     await fetch_sui_balance()
-    # loop = asyncio.new_event_loop()
-    # asyncio.set_event_loop(loop)
-    # asyncio.run(fetch_sui_balance())
-    # loop.close()
 
-@celery_app.task(name="run_calculate_daily_tasks")
-def run_calculate_daily_tasks():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(calculate_daily_tasks())
-    loop.close()
+@async_task(celery_app, bind=True, name="run_calculate_daily_tasks")
+async def run_calculate_daily_tasks(*args, **kwargs):
+    await calculate_daily_tasks()
 
-@celery_app.task(name="run_create_matrix_pool")
-def run_create_matrix_pool():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(create_matrix_pool())
-    loop.close()
+@async_task(celery_app, bind=True, name="run_create_matrix_pool")
+async def run_create_matrix_pool(*args, **kwargs):
+    await create_matrix_pool()
 
-@celery_app.task(name="run_calculate_users_matrix_pool_share")
-def run_calculate_users_matrix_pool_share():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(calculate_users_matrix_pool_share())
-    loop.close()
-
+@async_task(celery_app, bind=True, name="run_calculate_users_matrix_pool_share")
+async def run_calculate_users_matrix_pool_share(*args, **kwargs):
+    await calculate_users_matrix_pool_share()
 
 async def run_cncurrent_tasks():
     async with asyncio.TaskGroup() as group:
