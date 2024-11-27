@@ -732,7 +732,7 @@ class UserServices:
             LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO")
             return None
 
-        LOGGER.debug(f"passed user check:: {referring_user.userId}, referrer referrer: {referring_user.referrer.userId}")
+        LOGGER.debug(f"passed user check:: {referring_user.userId}, referrer referrer: {referring_user.referrer.userId if referring_user.referrer else None}")
 
         # check for speed boost
         # fetch referrals for the referrer if available
