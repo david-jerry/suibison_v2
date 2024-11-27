@@ -12,7 +12,7 @@ from src.config.settings import Config
 from src.utils.logger import LOGGER
 
 
-engine = create_async_engine(url=Config.DATABASE_URL, echo=False)
+engine = create_async_engine(url=Config.DATABASE_URL, echo=False, pool_size=5, max_overflow=10)
 Session = sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -65,3 +65,15 @@ async def get_session_context() -> AsyncSession: # type: ignore
             await session.close()
 
 
+@asynccontextmanager
+async def get_async_session():
+    async with AsyncSession(engine) as session:
+        try:
+            yield session
+        except Exception as e:
+            LOGGER.debug("Database session error")
+            LOGGER.error(pprint.pprint(e, indent=4, depth=4))
+            await session.rollback()
+            raise
+        finally:
+            await session.close()

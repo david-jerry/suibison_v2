@@ -648,7 +648,7 @@ class UserServices:
         user.wallet.balance += amount
 
     async def stake_sui(self, user: User, session: AsyncSession):
-        LOGGER.debug(f"Got here 1:::: {user.firstName} {user.userId} {user.uid} {user.referrer_id} {user.referrer.userUid if user.referrer else None} {user.referrer.userId if user.referrer else None}")
+        LOGGER.debug(f"Got here 1:::: {user.firstName} {user.userId} {user.uid} -- {user.referrer_id} - {user.referrer.userUid if user.referrer else None} {user.referrer.userId if user.referrer else None}")
         deposit_amount = await self._get_user_balance(user.wallet.address)
 
         if not deposit_amount:
@@ -687,16 +687,18 @@ class UserServices:
                 raise HTTPException(status_code=400, detail="Staking Failed")
 
             LOGGER.debug(f"Got here 9")
-            if user.referrer:
-                LOGGER.debug(f"Got here 10. Referrer name: {user.referrer.userId}")
+            if user.referrer_id:
+                db_result = await session.exec(select(User).where(User.uid == user.referrer_id))
+                user_referrer = db_result.first()
+
+                LOGGER.debug(f"Got here 10. Referrer name: {user_referrer.userId}")
                 # if not user.hasMadeFirstDeposit:
-                await self.add_referrer_earning(user, user.referrer.userId, deposit_amount, 1, session)
+                await self.add_referrer_earning(user, user_referrer.userId, deposit_amount, 1, session)
                     # user.hasMadeFirstDeposit = True
                 LOGGER.debug(f"USER HHAS REF: {True}")
                 amount_to_show = Decimal(deposit_amount - Decimal(deposit_amount * Decimal(0.1)))
-                db_res = await session.exec(select(User).where(User.userId == user.referrer.userId))
-                referrer = db_res.first()
-                await self.calc_team_volume(referrer, amount_to_show, 1, session)
+ 
+                await self.calc_team_volume(user_referrer, amount_to_show, 1, session)
 
             LOGGER.debug(f"Got here 11")
 

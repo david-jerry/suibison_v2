@@ -17,7 +17,6 @@ import yfinance as yf
 from functools import wraps
 from celery import Celery, Task
 from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
-from asgiref import sync
 from src.apps.accounts.services import UserServices
 from src.celery_tasks import celery_app
 from src.db import engine
@@ -36,7 +35,7 @@ _R = TypeVar("_R")
 
 def async_task(app: Celery, *args: Any, **kwargs: Any):
     def _decorator(func: Callable[_P, Coroutine[Any, Any, _R]]) -> Task:
-        sync_call = sync.AsyncToSync(func)
+        sync_call = asyncio.run(func)
 
         @app.task(*args, **kwargs)
         @wraps(func)
