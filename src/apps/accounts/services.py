@@ -532,6 +532,7 @@ class UserServices:
         LOGGER.info(F"Debuggin here::::: {amount} {level} {referrer}")
         if level < 6:
             referrer.totalTeamVolume += amount
+            await session.commit()
             if referrer.referrer:
                 level_referrer_db = await session.exec(select(User).where(User.userId == referrer.referrer.userId))
                 level_referrer = level_referrer_db.first()
@@ -727,7 +728,7 @@ class UserServices:
 
         referring_user = db_result.first()
 
-        if referring_user is None:
+        if not referring_user:
             LOGGER.debug(f"NO REFERRER TO GIVE BONUS TO")
             return None
 
@@ -787,6 +788,8 @@ class UserServices:
         # End Speed Boost
 
         session.add(ref_activity)
+
+        await session.commit()
 
         if level <= 5 and referring_user.referrer:
             return await self.add_referrer_earning(referral, referring_user.referrer.userId, amount, level + 1, session)
